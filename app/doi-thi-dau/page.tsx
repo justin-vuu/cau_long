@@ -1,0 +1,16 @@
+'use client';
+
+import { Swords, Trophy } from 'lucide-react';
+import PublicShell from '@/components/PublicShell';
+import PublicPageTitle from '@/components/PublicPageTitle';
+import { EmptyState, ErrorState, LoadingState } from '@/components/UiStates';
+import type { Team } from '@/lib/types';
+import { useApiData } from '@/hooks/useApiData';
+
+export default function TeamsPage() {
+  const { data, loading, error, reload } = useApiData<{ teams: Team[] }>('layDanhSachDoiCongKhai');
+  return <PublicShell><PublicPageTitle eyebrow="KẾT QUẢ BỐC THĂM" title="Danh sách đội thi đấu" description="Mỗi đội gồm hai người chơi được hệ thống ghép đôi ngẫu nhiên, sau đó xáo trộn vị trí trong bracket." /><main className="container-page teams-main">
+    <div className="teams-summary"><span><Swords /> {data?.teams.length || 0} đội thi đấu</span><small>Thứ tự hiển thị theo vị trí bracket</small></div>
+    {loading ? <div className="card"><LoadingState /></div> : error ? <div className="card"><ErrorState message={error} onRetry={reload} /></div> : !data?.teams.length ? <div className="card"><EmptyState title="Chưa bốc thăm đội" message="Danh sách sẽ xuất hiện sau khi ban tổ chức hoàn tất bốc thăm." /></div> : <div className="team-grid">{data.teams.map(team => <article className="card team-card" key={team.MaDoi}><div className="team-head"><span><Trophy size={16} /> {team.MaDoi}</span><b>VỊ TRÍ #{team.ViTriBracket}</b></div><h2>{team.TenHienThi}</h2><div className="member"><span>1</span><div><b>{team.ThanhVien1?.HoTen}</b><small>{team.ThanhVien1?.TrinhDo}</small></div></div><div className="member"><span>2</span><div><b>{team.ThanhVien2?.HoTen}</b><small>{team.ThanhVien2?.TrinhDo}</small></div></div></article>)}</div>}
+  </main><style>{`.teams-main{padding:36px 0}.teams-summary{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.teams-summary span{display:flex;align-items:center;gap:8px;font-weight:800}.teams-summary span svg{color:var(--orange);width:19px}.teams-summary small{color:var(--muted)}.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.team-card{padding:0;overflow:hidden}.team-head{background:#f8fafc;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;padding:12px 16px}.team-head span{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--orange);font-weight:900}.team-head b{font-size:9px;letter-spacing:.08em;color:var(--muted)}.team-card h2{font-size:15px;padding:16px 16px 12px;margin:0;border-bottom:1px dashed var(--line)}.member{display:flex;align-items:center;gap:11px;margin:12px 16px}.member>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--navy-2);color:#fff;font-size:11px;font-weight:900}.member div{display:flex;justify-content:space-between;align-items:center;gap:10px;flex:1}.member b{font-size:13px}.member small{font-size:10px;padding:4px 7px;border-radius:6px;color:var(--blue);background:var(--blue-soft);white-space:nowrap}@media(max-width:900px){.team-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.team-grid{grid-template-columns:1fr}.teams-summary{align-items:flex-start;gap:7px;flex-direction:column}}`}</style></PublicShell>;
+}

@@ -1,0 +1,3 @@
+export default function PublicPageTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return <section className="public-title"><div className="container-page"><span>{eyebrow}</span><h1>{title}</h1><p>{description}</p></div><style>{`.public-title{background:linear-gradient(120deg,var(--navy-1),#1c3558);padding:52px 0;color:#fff}.public-title span{color:#ffad74;font-size:10px;letter-spacing:.18em;font-weight:900}.public-title h1{font-size:34px;margin:10px 0 9px;letter-spacing:-.025em}.public-title p{margin:0;color:#9fadc2;font-size:14px;line-height:1.6;max-width:680px}`}</style></section>;
+}
