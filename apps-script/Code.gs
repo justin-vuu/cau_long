@@ -12,6 +12,8 @@ const SCHEMA = {
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
+const DATABASE_SCHEMA_VERSION = '2026-08-03.2';
+let spreadsheetInstance = null;
 
 const PUBLIC_ACTIONS = new Set([
   'dangNhap', 'layGiaiDauCongKhai', 'dangKyNguoiChoi',
@@ -58,15 +60,17 @@ function doPost(e) {
 // ---------- CẤU HÌNH, SCHEMA VÀ XÁC THỰC ----------
 
 function ensureDatabase() {
-  const spreadsheet = getSpreadsheet();
-  Object.keys(SCHEMA).forEach(name => ensureSheet(spreadsheet, name, SCHEMA[name]));
-  ensureInitialAdmin();
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DATABASE_SCHEMA_VERSION') !== DATABASE_SCHEMA_VERSION) ensureDatabaseSheetsOnly();
+  if (props.getProperty('INITIAL_ADMIN_PASSWORD')) ensureInitialAdmin();
 }
 
 function getSpreadsheet() {
+  if (spreadsheetInstance) return spreadsheetInstance;
   const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
   if (!id) throw apiError('Chưa cấu hình Script Property SPREADSHEET_ID.', 'CONFIG_ERROR');
-  return SpreadsheetApp.openById(id);
+  spreadsheetInstance = SpreadsheetApp.openById(id);
+  return spreadsheetInstance;
 }
 
 function ensureSheet(spreadsheet, name, requiredHeaders) {
@@ -133,6 +137,7 @@ function khoiTaoHoacDatLaiAdminTuProperties() {
 function ensureDatabaseSheetsOnly() {
   const spreadsheet = getSpreadsheet();
   Object.keys(SCHEMA).forEach(name => ensureSheet(spreadsheet, name, SCHEMA[name]));
+  PropertiesService.getScriptProperties().setProperty('DATABASE_SCHEMA_VERSION', DATABASE_SCHEMA_VERSION);
 }
 
 function validateSharedSecret(provided) {
@@ -175,8 +180,12 @@ function verifySession(token) {
     if (parts.length !== 2 || !constantTimeEqual(signText(parts[0]), parts[1])) throw new Error('bad signature');
     const payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(padBase64(parts[0]))).getDataAsString());
     if (!payload.exp || Number(payload.exp) < Date.now()) throw new Error('expired');
-    const user = readRows('NguoiDung').find(item => String(item.MaNguoiDung) === String(payload.uid));
+    const cache = CacheService.getScriptCache();
+    const cacheKey = 'admin-user:' + String(payload.uid);
+    const cachedUser = cache.get(cacheKey);
+    const user = cachedUser ? JSON.parse(cachedUser) : readRows('NguoiDung').find(item => String(item.MaNguoiDung) === String(payload.uid));
     if (!user || String(user.TrangThai) !== 'HOAT_DONG' || String(user.VaiTro) !== 'ADMIN') throw new Error('disabled');
+    if (!cachedUser) cache.put(cacheKey, JSON.stringify(stripInternal(user)), 300);
     return user;
   } catch (e) { throw apiError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'UNAUTHORIZED'); }
 }
