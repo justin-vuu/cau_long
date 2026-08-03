@@ -80,3 +80,31 @@ test('luồng nghiệp vụ 32 đăng ký -> bốc thăm -> lưu tỷ số -> đ
   assert.equal(result.nextWinnerSlot, result.winner);
   assert.equal(result.tournamentStatus, 'DANG_THI_DAU');
 });
+
+test('seed test tạo đúng 31 người và tất cả đều có nhãn an toàn', () => {
+  assert.match(source, /function appendRows\(/);
+  const result = evaluate(`(() => {
+    const memory = {players: []};
+    ensureDatabaseSheetsOnly = () => {};
+    getTournament = () => ({MaGiai:'G1'});
+    rowsForTournament = name => name === 'NguoiChoi' ? memory.players : [];
+    appendRows = (name, rows) => { if (name === 'NguoiChoi') memory.players.push(...rows); };
+    appendLog = () => {};
+    bumpCacheVersion = () => {};
+    SpreadsheetApp = {flush: () => {}};
+    withLock = work => work();
+    const output = tao31NguoiChoiMauSauKhiXacNhan();
+    return {
+      output,
+      count: memory.players.length,
+      confirmed: memory.players.filter(p => p.TrangThai === 'DA_XAC_NHAN').length,
+      tagged: memory.players.filter(p => String(p.GhiChu).startsWith('[TEST-31]')).length,
+      paid: memory.players.filter(p => p.DaChuyenKhoan === true).length,
+    };
+  })()`);
+  assert.equal(result.output.created, 31);
+  assert.equal(result.count, 31);
+  assert.equal(result.confirmed, 31);
+  assert.equal(result.tagged, 31);
+  assert.equal(result.paid, 31);
+});

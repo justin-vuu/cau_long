@@ -608,6 +608,14 @@ function appendRow(sheetName, object) {
   sheet.appendRow(headers.map(header => valueForSheet(object[header])));
 }
 
+function appendRows(sheetName, objects) {
+  if (!objects || !objects.length) return;
+  const sheet = getSpreadsheet().getSheetByName(sheetName);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const values = objects.map(object => headers.map(header => valueForSheet(object[header])));
+  sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
+}
+
 function updateRow(sheetName, idField, idValue, updates) {
   const sheet = getSpreadsheet().getSheetByName(sheetName);
   const rows = readRows(sheetName); const target = rows.find(row => String(row[idField]) === String(idValue));
