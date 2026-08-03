@@ -1,5 +1,16 @@
 import type { ApiResponse } from '@/lib/types';
 
+const WRITE_ACTIONS = new Set([
+  'dangKyNguoiChoi', 'luuGiaiDau', 'themNguoiChoi', 'suaNguoiChoi', 'xoaNguoiChoi',
+  'capNhatTrangThaiNguoiChoi', 'khoaDangKy', 'moDangKy', 'bocThamGiaiDau',
+  'huyKetQuaBocTham', 'capNhatKetQuaTranDau', 'dangXuat',
+]);
+
+function clearApiSessionCache() {
+  if (typeof window === 'undefined') return;
+  Object.keys(window.sessionStorage).filter(key => key.startsWith('dtcl_api:')).forEach(key => window.sessionStorage.removeItem(key));
+}
+
 export async function callApi<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const response = await fetch('/api/apps-script', {
     method: 'POST',
@@ -12,6 +23,7 @@ export async function callApi<T>(action: string, payload: Record<string, unknown
   if (!response.ok || !result.ok || result.data === undefined) {
     throw new Error(result.error || 'Không thể kết nối đến hệ thống. Vui lòng thử lại.');
   }
+  if (WRITE_ACTIONS.has(action)) clearApiSessionCache();
   return result.data;
 }
 

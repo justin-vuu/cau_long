@@ -44,6 +44,7 @@ Có thể mở URL `/exec` trên trình duyệt để kiểm tra health response
 - Action Admin cần token ký HMAC, thời hạn 8 giờ; token được frontend giữ trong cookie HttpOnly.
 - `bocThamGiaiDau` và `capNhatKetQuaTranDau` dùng `LockService.getScriptLock()`.
 - Ghi dữ liệu bốc thăm/trận đấu được thực hiện theo lô trong một critical section.
+- Đội được chia bảng vòng tròn linh hoạt; nhất nhì mỗi bảng tự động được xếp chéo bảng vào vòng loại trực tiếp.
 - Mọi action ghi tăng `CACHE_VERSION`, làm vô hiệu ngay cache công khai cũ.
 - Không có seed chạy tự động hoặc nằm trong API production.
 - Khi cần kiểm thử thủ công, có thể chạy `tao31NguoiChoiMauSauKhiXacNhan` trong editor. Hàm chỉ chạy khi giải đã được tạo, danh sách người chơi trống và chưa bốc thăm; toàn bộ 31 dòng có nhãn `[TEST-31]`. Dùng `xoaNguoiChoiMauSauKhiXacNhan` để xóa riêng các dòng mẫu này.

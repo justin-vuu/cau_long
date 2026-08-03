@@ -1,12 +1,13 @@
 # Đấu Trường Cầu Lông
 
-Ứng dụng quản lý giải cầu lông đôi loại trực tiếp bằng Next.js và Google Apps Script/Google Sheets. Mô hình MVP là **đăng ký cá nhân rồi bốc thăm ghép đôi**. Người chơi không đăng ký sẵn theo cặp; kiến trúc tách `NguoiChoi` và `DoiThiDau` để sau này có thể bổ sung chế độ đăng ký đôi mà không phải viết lại bracket.
+Ứng dụng quản lý giải cầu lông đôi bằng Next.js và Google Apps Script/Google Sheets. Mô hình là **đăng ký cá nhân rồi bốc thăm ghép đôi**, thi đấu vòng bảng trước khi vào loại trực tiếp. Người chơi không đăng ký sẵn theo cặp; kiến trúc tách `NguoiChoi` và `DoiThiDau` để sau này có thể bổ sung chế độ đăng ký đôi.
 
 ## Chức năng MVP
 
 - Trang công khai: thông tin giải, QR chuyển khoản, đăng ký bằng tên/SĐT/giới tính, danh sách người chơi (ẩn SĐT), danh sách đội, bracket và tỷ số trực tiếp.
 - Admin: phiên đăng nhập HttpOnly, tạo/cấu hình giải, CRUD/xác nhận người chơi, CSV, khóa/mở đăng ký.
-- Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi, tạo bracket 8/16/32/64 hoặc lớn hơn theo thuật toán chung, tự phân bố BYE.
+- Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi và chia bảng cân bằng. 12–16 đội có 4 bảng lấy top 2 vào tứ kết; 6–11 đội có 2 bảng lấy top 2 vào bán kết; 3–5 đội lấy top 2 vào chung kết.
+- Vòng bảng tính thứ hạng theo số trận thắng, hiệu số hiệp, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
 - Nhập tối đa ba hiệp, chọn đội thắng, bỏ cuộc, tự đẩy đội thắng; bảo vệ kết quả phụ thuộc và hỗ trợ tranh hạng ba.
 - Google Sheet là nguồn dữ liệu production duy nhất; không có mock fallback.
 

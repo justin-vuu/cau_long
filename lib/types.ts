@@ -44,8 +44,32 @@ export interface Team {
   ViTriBracket: number;
   TenHienThi: string;
   TrangThai: string;
+  BangDau?: string;
   ThanhVien1?: TeamMember;
   ThanhVien2?: TeamMember;
+}
+
+export interface GroupStanding {
+  ThuHang: number;
+  MaDoi: string;
+  Doi: Team;
+  SoTran: number;
+  Thang: number;
+  Thua: number;
+  HiepThang: number;
+  HiepThua: number;
+  HieuSoHiep: number;
+  DiemThang: number;
+  DiemThua: number;
+  HieuSoDiem: number;
+  DaDuDieuKien: boolean;
+}
+
+export interface TournamentGroup {
+  MaBang: string;
+  TenBang: string;
+  standings: GroupStanding[];
+  matches: Match[];
 }
 
 export interface Match {
@@ -71,7 +95,7 @@ export interface Match {
 }
 
 export interface BracketRound { key: string; name: string; roundNumber: number; matches: Match[] }
-export interface BracketData { tournament: Tournament; bracketSize: number; rounds: BracketRound[]; thirdPlaceMatch?: Match | null }
+export interface BracketData { tournament: Tournament; bracketSize: number; groups: TournamentGroup[]; rounds: BracketRound[]; thirdPlaceMatch?: Match | null; groupStageCompleted?: boolean }
 
 export interface DashboardData {
   tournament: Tournament;

@@ -18,7 +18,7 @@ export default function HomePage() {
           <div className="court-lines" />
           <div className="container-page hero-grid">
             <div className="hero-copy">
-              <span className="eyebrow"><span /> GIẢI ĐÔI LOẠI TRỰC TIẾP</span>
+              <span className="eyebrow"><span /> VÒNG BẢNG & LOẠI TRỰC TIẾP</span>
               <h1>{tournament?.TenGiai || 'Đấu Trường Cầu Lông'}</h1>
               <p className="lead">Đăng ký <b>cá nhân</b>, hệ thống bốc thăm ngẫu nhiên để ghép đôi và xếp bracket. Công bằng, minh bạch, đầy kịch tính.</p>
               <div className="hero-actions">

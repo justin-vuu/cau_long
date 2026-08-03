@@ -48,7 +48,23 @@ test('kiểm tra tỷ số từ chối đội thắng không khớp', () => {
   assert.throws(() => evaluate(`validateScores(['21-18','18-21','21-17'], {MaDoi1:'A', MaDoi2:'B'}, 'B')`), /không khớp/);
 });
 
-test('luồng nghiệp vụ 32 đăng ký -> bốc thăm -> lưu tỷ số -> đi tiếp', () => {
+test('chia bảng linh hoạt tạo đúng số trận vòng tròn', () => {
+  const result = evaluate(`(() => {
+    const build = count => {
+      const teams = Array.from({length:count}, (_, i) => ({MaDoi:'D'+(i+1), MaGiai:'G1'}));
+      const groups = determineGroupCount(count);
+      teams.forEach((team, index) => team.BangDau = String.fromCharCode(65 + index % groups));
+      return {groups, matches:createGroupStageMatches({MaGiai:'G1'}, teams, groups).length};
+    };
+    return {n16:build(16), n12:build(12), n10:build(10), n6:build(6), n4:build(4)};
+  })()`);
+  assert.equal(JSON.stringify(result), JSON.stringify({
+    n16: { groups: 4, matches: 24 }, n12: { groups: 4, matches: 12 },
+    n10: { groups: 2, matches: 20 }, n6: { groups: 2, matches: 6 }, n4: { groups: 1, matches: 6 },
+  }));
+});
+
+test('32 người -> 16 đội -> 4 bảng -> top 8 -> tứ kết đi tiếp', () => {
   const result = evaluate(`(() => {
     const memory = {
       tournament: {MaGiai:'G1', TenGiai:'Giải test', TrangThai:'DA_KHOA_DANG_KY', SoNguoiToiThieu:32, CoTranhHangBa:false},
@@ -62,7 +78,15 @@ test('luồng nghiệp vụ 32 đăng ký -> bốc thăm -> lưu tỷ số -> đ
     appendLog = () => {};
     withLock = work => work();
     const draw = bocThamGiaiDau({_user:{TaiKhoan:'admin',HoTen:'Admin Test'}});
-    const first = memory.TranDau.find(match => roundNumber(match) === 1);
+    const groupIds = memory.TranDau.filter(isGroupMatch).map(match => match.MaTran);
+    groupIds.forEach(id => {
+      const match = memory.TranDau.find(item => item.MaTran === id);
+      capNhatKetQuaTranDau({
+        _user:{TaiKhoan:'admin'}, MaTran:id, MaDoiThang:match.MaDoi1,
+        TySoHiep1:'21-18', TySoHiep2:'21-17', TySoHiep3:'', GhiChu:'', BoCuoc:false
+      });
+    });
+    const first = memory.TranDau.find(match => !isGroupMatch(match) && roundNumber(match) === 1);
     const winner = first.MaDoi1;
     capNhatKetQuaTranDau({
       _user:{TaiKhoan:'admin'}, MaTran:first.MaTran, MaDoiThang:winner,
@@ -71,11 +95,13 @@ test('luồng nghiệp vụ 32 đăng ký -> bốc thăm -> lưu tỷ số -> đ
     const saved = memory.TranDau.find(match => match.MaTran === first.MaTran);
     const next = memory.TranDau.find(match => match.MaTran === saved.MaTranTiepTheo);
     const nextWinnerSlot = Number(saved.ViTriVaoTranTiepTheo) === 1 ? next.MaDoi1 : next.MaDoi2;
-    return {draw, teams:memory.DoiThiDau.length, matches:memory.TranDau.length, savedStatus:saved.TrangThai, nextWinnerSlot, winner, tournamentStatus:memory.tournament.TrangThai};
+    return {draw, teams:memory.DoiThiDau.length, groupMatches:memory.TranDau.filter(isGroupMatch).length, knockoutMatches:memory.TranDau.filter(m => !isGroupMatch(m)).length, savedStatus:saved.TrangThai, nextWinnerSlot, winner, tournamentStatus:memory.tournament.TrangThai};
   })()`);
   assert.equal(result.draw.teamsCreated, 16);
+  assert.equal(result.draw.groupCount, 4);
   assert.equal(result.teams, 16);
-  assert.equal(result.matches, 15);
+  assert.equal(result.groupMatches, 24);
+  assert.equal(result.knockoutMatches, 7);
   assert.equal(result.savedStatus, 'HOAN_THANH');
   assert.equal(result.nextWinnerSlot, result.winner);
   assert.equal(result.tournamentStatus, 'DANG_THI_DAU');

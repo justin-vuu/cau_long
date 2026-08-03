@@ -7,12 +7,12 @@
 const SCHEMA = {
   GiaiDau: ['MaGiai', 'TenGiai', 'DiaDiem', 'NgayBatDau', 'HanDangKy', 'TrangThai', 'SoNguoiToiThieu', 'CoTranhHangBa', 'ThoiGianBocTham', 'NguoiBocTham'],
   NguoiChoi: ['MaNguoiChoi', 'MaGiai', 'HoTen', 'SoDienThoai', 'GioiTinh', 'TrinhDo', 'CauLacBo', 'GhiChu', 'TrangThai', 'ThoiGianDangKy', 'DaChuyenKhoan'],
-  DoiThiDau: ['MaDoi', 'MaGiai', 'MaNguoiChoi1', 'MaNguoiChoi2', 'ViTriBracket', 'TenHienThi', 'TrangThai'],
+  DoiThiDau: ['MaDoi', 'MaGiai', 'MaNguoiChoi1', 'MaNguoiChoi2', 'ViTriBracket', 'TenHienThi', 'TrangThai', 'BangDau'],
   TranDau: ['MaTran', 'MaGiai', 'Vong', 'ThuTuTran', 'MaDoi1', 'MaDoi2', 'MaDoiThang', 'TySoHiep1', 'TySoHiep2', 'TySoHiep3', 'TrangThai', 'MaTranTiepTheo', 'ViTriVaoTranTiepTheo', 'GhiChu'],
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
-const DATABASE_SCHEMA_VERSION = '2026-08-03.2';
+const DATABASE_SCHEMA_VERSION = '2026-08-03.3';
 let spreadsheetInstance = null;
 
 const PUBLIC_ACTIONS = new Set([
@@ -23,6 +23,10 @@ const WRITE_ACTIONS = new Set([
   'dangKyNguoiChoi', 'luuGiaiDau', 'themNguoiChoi', 'suaNguoiChoi', 'xoaNguoiChoi',
   'capNhatTrangThaiNguoiChoi', 'khoaDangKy', 'moDangKy', 'bocThamGiaiDau',
   'huyKetQuaBocTham', 'capNhatKetQuaTranDau',
+]);
+const CACHEABLE_ADMIN_ACTIONS = new Set([
+  'layDashboardGiaiDau', 'layGiaiDauQuanTri', 'layDanhSachNguoiChoiQuanTri',
+  'layDuLieuBocTham', 'layDanhSachTranDauQuanTri',
 ]);
 
 function doGet() {
@@ -48,7 +52,7 @@ function doPost(e) {
       layDanhSachTranDauQuanTri, capNhatKetQuaTranDau,
     };
     if (!handlers[action]) throw apiError('Action không được hỗ trợ.', 'NOT_FOUND');
-    const data = handlers[action](request);
+    const data = CACHEABLE_ADMIN_ACTIONS.has(action) ? cached('admin:' + action, 20, () => handlers[action](request)) : handlers[action](request);
     if (WRITE_ACTIONS.has(action)) bumpCacheVersion();
     return jsonOutput({ ok: true, data: data === undefined ? {} : data });
   } catch (error) {
@@ -217,7 +221,7 @@ function luuGiaiDau(request) {
     MaGiai: existing ? existing.MaGiai : makeId('GIAI'), TenGiai: name, DiaDiem: location,
     NgayBatDau: start, HanDangKy: deadline,
     TrangThai: existing ? existing.TrangThai : 'DANG_DANG_KY',
-    SoNguoiToiThieu: Math.max(32, Number(input.SoNguoiToiThieu) || 32),
+    SoNguoiToiThieu: Math.max(6, Number(input.SoNguoiToiThieu) || 32),
     CoTranhHangBa: toBoolean(input.CoTranhHangBa),
     ThoiGianBocTham: existing ? existing.ThoiGianBocTham : '', NguoiBocTham: existing ? existing.NguoiBocTham : '',
   };
@@ -345,7 +349,7 @@ function validatePlayer(input, tournamentId, excludeId, isAdmin) {
 function khoaDangKy(request) {
   const tournament = requireTournament(); assertRosterEditable(tournament);
   const validCount = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN').length;
-  const minimum = Math.max(32, Number(tournament.SoNguoiToiThieu) || 32);
+  const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
   if (validCount < minimum) throw apiError('Cần ít nhất ' + minimum + ' người đã xác nhận để khóa đăng ký.', 'DRAW_CONDITION');
   if (validCount % 2 !== 0) throw apiError('Số người hợp lệ phải là số chẵn.', 'DRAW_CONDITION');
   updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, { TrangThai: 'DA_KHOA_DANG_KY' });
@@ -370,7 +374,7 @@ function layDuLieuBocTham() {
   const tournament = requireTournament();
   const eligiblePlayers = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN');
   const teams = rowsForTournament('DoiThiDau', tournament.MaGiai);
-  const minimum = Math.max(32, Number(tournament.SoNguoiToiThieu) || 32);
+  const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
   let reason = '';
   if (teams.length) reason = 'Giải đã có kết quả bốc thăm.';
   else if (String(tournament.TrangThai) !== 'DA_KHOA_DANG_KY') reason = 'Cần khóa đăng ký trước khi bốc thăm.';
@@ -385,7 +389,7 @@ function bocThamGiaiDau(request) {
     if (String(tournament.TrangThai) !== 'DA_KHOA_DANG_KY') throw apiError('Cần khóa đăng ký trước khi bốc thăm.', 'DRAW_CONDITION');
     if (rowsForTournament('DoiThiDau', tournament.MaGiai).length) throw apiError('Giải đã bốc thăm. Hãy hủy kết quả trước khi thực hiện lại.', 'ALREADY_DRAWN');
     const players = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN');
-    const minimum = Math.max(32, Number(tournament.SoNguoiToiThieu) || 32);
+    const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
     if (players.length < minimum || players.length % 2) throw apiError('Danh sách phải có ít nhất ' + minimum + ' người hợp lệ và là số chẵn.', 'DRAW_CONDITION');
 
     fisherYates(players);
@@ -400,17 +404,48 @@ function bocThamGiaiDau(request) {
       });
     }
     fisherYates(teams);
-    const bracketSize = nextPowerOfTwo(teams.length);
-    const slots = distributeTeamsWithByes(teams, bracketSize);
-    slots.forEach((team, index) => { if (team) team.ViTriBracket = index + 1; });
-    const matches = createBracketMatches(tournament, slots, bracketSize);
+    const groupCount = determineGroupCount(teams.length);
+    teams.forEach((team, index) => {
+      team.BangDau = String.fromCharCode(65 + (index % groupCount));
+      team.ViTriBracket = index + 1;
+    });
+    const matches = createGroupStageMatches(tournament, teams, groupCount);
     replaceRows('DoiThiDau', teams);
     replaceRows('TranDau', matches);
     const now = new Date();
     updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, { TrangThai: 'DA_BOC_THAM', ThoiGianBocTham: now, NguoiBocTham: request._user.HoTen || request._user.TaiKhoan });
-    appendLog(tournament.MaGiai, request._user.TaiKhoan, 'BOC_THAM_GIAI_DAU', players.length + ' người, ' + teams.length + ' đội, bracket ' + bracketSize + '.');
-    return { playersShuffled: players.length, teamsCreated: teams.length, bracketSize, byes: bracketSize - teams.length, drawTime: now };
+    appendLog(tournament.MaGiai, request._user.TaiKhoan, 'BOC_THAM_GIAI_DAU', players.length + ' người, ' + teams.length + ' đội, ' + groupCount + ' bảng vòng tròn.');
+    return { playersShuffled: players.length, teamsCreated: teams.length, groupCount, groupMatches: matches.length, bracketSize: groupCount * 2, byes: 0, drawTime: now };
   });
+}
+
+function determineGroupCount(teamCount) {
+  if (teamCount >= 12) return 4;
+  if (teamCount >= 6) return 2;
+  if (teamCount >= 3) return 1;
+  throw apiError('Cần ít nhất 3 đội để tổ chức vòng bảng.', 'DRAW_CONDITION');
+}
+
+function createGroupStageMatches(tournament, teams, groupCount) {
+  const matches = [];
+  for (let groupIndex = 0; groupIndex < groupCount; groupIndex++) {
+    const groupCode = String.fromCharCode(65 + groupIndex);
+    const groupTeams = teams.filter(team => String(team.BangDau) === groupCode);
+    let order = 1;
+    for (let i = 0; i < groupTeams.length; i++) {
+      for (let j = i + 1; j < groupTeams.length; j++) {
+        matches.push({
+          MaTran: 'VB-' + groupCode + '-' + String(order).padStart(2, '0'), MaGiai: tournament.MaGiai,
+          Vong: 'VONG_BANG_' + groupCode, ThuTuTran: order,
+          MaDoi1: groupTeams[i].MaDoi, MaDoi2: groupTeams[j].MaDoi, MaDoiThang: '',
+          TySoHiep1: '', TySoHiep2: '', TySoHiep3: '', TrangThai: 'CHO_THI_DAU',
+          MaTranTiepTheo: '', ViTriVaoTranTiepTheo: '', GhiChu: '',
+        });
+        order++;
+      }
+    }
+  }
+  return matches;
 }
 
 function distributeTeamsWithByes(teams, bracketSize) {
@@ -487,27 +522,96 @@ function layDanhSachDoiCongKhai() {
 }
 
 function layBangDauCongKhai() { return cached('bracket-public', 30, () => buildBracketResponse()); }
-function layDanhSachTranDauQuanTri() { return buildBracketResponse(); }
+function layDanhSachTranDauQuanTri() { return cached('matches-admin', 20, () => buildBracketResponse()); }
 
 function buildBracketResponse() {
   const tournament = requireTournament();
   const teams = enrichTeams(rowsForTournament('DoiThiDau', tournament.MaGiai), tournament.MaGiai);
   const teamMap = Object.fromEntries(teams.map(team => [String(team.MaDoi), team]));
   const rawMatches = rowsForTournament('TranDau', tournament.MaGiai);
-  const normal = rawMatches.filter(match => String(match.Vong) !== 'TRANH_HANG_BA');
-  const bracketSize = normal.filter(match => roundNumber(match) === 1).length * 2;
+  const groupRawMatches = rawMatches.filter(isGroupMatch);
+  const knockoutRawMatches = rawMatches.filter(match => !isGroupMatch(match) && String(match.Vong) !== 'TRANH_HANG_BA');
+  const bracketSize = knockoutRawMatches.filter(match => roundNumber(match) === 1).length * 2;
   const matches = rawMatches.map(match => Object.assign({}, match, {
-    SoVong: roundNumber(match), TenVong: roundDisplayName(match, bracketSize),
+    SoVong: isGroupMatch(match) ? 0 : roundNumber(match),
+    TenVong: isGroupMatch(match) ? 'Bảng ' + groupCodeFromMatch(match) : roundDisplayName(match, bracketSize),
     Doi1: teamMap[String(match.MaDoi1)] || null, Doi2: teamMap[String(match.MaDoi2)] || null,
     LaTranTranhHangBa: String(match.Vong) === 'TRANH_HANG_BA',
   }));
-  const roundNumbers = Array.from(new Set(matches.filter(match => !match.LaTranTranhHangBa).map(match => match.SoVong))).sort((a, b) => a - b);
+  const groupCodes = Array.from(new Set(teams.map(team => String(team.BangDau || '')).filter(Boolean))).sort();
+  const standingsByGroup = calculateGroupStandings(teams, groupRawMatches);
+  const groups = groupCodes.map(code => ({
+    MaBang: code, TenBang: 'Bảng ' + code,
+    standings: standingsByGroup[code] || [],
+    matches: matches.filter(match => isGroupMatch(match) && groupCodeFromMatch(match) === code).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran)),
+  }));
+  const roundNumbers = Array.from(new Set(matches.filter(match => !match.LaTranTranhHangBa && !isGroupMatch(match)).map(match => match.SoVong))).sort((a, b) => a - b);
   const rounds = roundNumbers.map(number => ({
     key: 'R' + number, roundNumber: number,
-    name: matches.find(match => match.SoVong === number && !match.LaTranTranhHangBa).TenVong,
-    matches: matches.filter(match => match.SoVong === number && !match.LaTranTranhHangBa).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran)),
+    name: matches.find(match => match.SoVong === number && !match.LaTranTranhHangBa && !isGroupMatch(match)).TenVong,
+    matches: matches.filter(match => match.SoVong === number && !match.LaTranTranhHangBa && !isGroupMatch(match)).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran)),
   }));
-  return { tournament: publicTournament(tournament), bracketSize: bracketSize || 0, rounds, thirdPlaceMatch: matches.find(match => match.LaTranTranhHangBa) || null };
+  const groupStageCompleted = groupRawMatches.length > 0 && groupRawMatches.every(isCompletedMatch);
+  return { tournament: publicTournament(tournament), bracketSize: bracketSize || 0, groups, groupStageCompleted, rounds, thirdPlaceMatch: matches.find(match => match.LaTranTranhHangBa) || null };
+}
+
+function isGroupMatch(match) { return String(match.Vong || '').indexOf('VONG_BANG_') === 0; }
+function groupCodeFromMatch(match) { return String(match.Vong || '').replace('VONG_BANG_', ''); }
+function isCompletedMatch(match) { return ['HOAN_THANH', 'BO_CUOC', 'MIEN_DAU'].indexOf(String(match.TrangThai)) >= 0; }
+
+function calculateGroupStandings(teams, groupMatches) {
+  const result = {};
+  const groupCodes = Array.from(new Set(teams.map(team => String(team.BangDau || '')).filter(Boolean)));
+  groupCodes.forEach(code => {
+    const groupTeams = teams.filter(team => String(team.BangDau) === code);
+    const matches = groupMatches.filter(match => groupCodeFromMatch(match) === code);
+    const rows = Object.fromEntries(groupTeams.map(team => [String(team.MaDoi), {
+      ThuHang: 0, MaDoi: team.MaDoi, Doi: team, SoTran: 0, Thang: 0, Thua: 0,
+      HiepThang: 0, HiepThua: 0, HieuSoHiep: 0, DiemThang: 0, DiemThua: 0, HieuSoDiem: 0, DaDuDieuKien: false,
+    }]));
+    matches.filter(isCompletedMatch).forEach(match => {
+      const row1 = rows[String(match.MaDoi1)]; const row2 = rows[String(match.MaDoi2)];
+      if (!row1 || !row2) return;
+      row1.SoTran++; row2.SoTran++;
+      if (String(match.MaDoiThang) === String(match.MaDoi1)) { row1.Thang++; row2.Thua++; }
+      else if (String(match.MaDoiThang) === String(match.MaDoi2)) { row2.Thang++; row1.Thua++; }
+      [match.TySoHiep1, match.TySoHiep2, match.TySoHiep3].filter(Boolean).forEach(score => {
+        const pair = String(score).split('-').map(Number);
+        row1.DiemThang += pair[0] || 0; row1.DiemThua += pair[1] || 0;
+        row2.DiemThang += pair[1] || 0; row2.DiemThua += pair[0] || 0;
+        if (pair[0] > pair[1]) { row1.HiepThang++; row2.HiepThua++; }
+        else { row2.HiepThang++; row1.HiepThua++; }
+      });
+    });
+    const groupCompleted = matches.length > 0 && matches.every(isCompletedMatch);
+    const sorted = Object.values(rows).map(row => {
+      row.HieuSoHiep = row.HiepThang - row.HiepThua; row.HieuSoDiem = row.DiemThang - row.DiemThua; return row;
+    }).sort((a, b) => {
+      if (b.Thang !== a.Thang) return b.Thang - a.Thang;
+      if (b.HieuSoHiep !== a.HieuSoHiep) return b.HieuSoHiep - a.HieuSoHiep;
+      if (b.HieuSoDiem !== a.HieuSoDiem) return b.HieuSoDiem - a.HieuSoDiem;
+      const direct = matches.find(match => isCompletedMatch(match) && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(a.MaDoi)) >= 0 && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(b.MaDoi)) >= 0);
+      if (direct) return String(direct.MaDoiThang) === String(a.MaDoi) ? -1 : 1;
+      return String(a.MaDoi).localeCompare(String(b.MaDoi));
+    });
+    sorted.forEach((row, index) => { row.ThuHang = index + 1; row.DaDuDieuKien = groupCompleted && index < 2; });
+    result[code] = sorted;
+  });
+  return result;
+}
+
+function createKnockoutAfterGroups(tournament, teams, groupMatches) {
+  const standings = calculateGroupStandings(teams, groupMatches);
+  const codes = Object.keys(standings).sort();
+  if (!codes.length || !groupMatches.length || !groupMatches.every(isCompletedMatch)) return [];
+  const qualified = {};
+  codes.forEach(code => { qualified[code + '1'] = standings[code][0] && standings[code][0].Doi; qualified[code + '2'] = standings[code][1] && standings[code][1].Doi; });
+  let seedKeys;
+  if (codes.length === 4) seedKeys = ['A1', 'B2', 'C1', 'D2', 'B1', 'A2', 'D1', 'C2'];
+  else if (codes.length === 2) seedKeys = ['A1', 'B2', 'B1', 'A2'];
+  else seedKeys = ['A1', 'A2'];
+  const slots = seedKeys.map(key => qualified[key]).filter(Boolean);
+  return createBracketMatches(tournament, slots, slots.length);
 }
 
 function capNhatKetQuaTranDau(request) {
@@ -524,8 +628,18 @@ function capNhatKetQuaTranDau(request) {
     const scores = [cleanScore(request.TySoHiep1), cleanScore(request.TySoHiep2), cleanScore(request.TySoHiep3)];
     if (!forfeit) validateScores(scores, target, winner);
 
+    const groupTarget = isGroupMatch(target);
+    const knockoutMatches = matches.filter(match => !isGroupMatch(match));
+    if (groupTarget && knockoutMatches.length) {
+      const completedKnockout = knockoutMatches.filter(match => isCompletedMatch(match) && String(match.TrangThai) !== 'MIEN_DAU');
+      if (completedKnockout.length && !toBoolean(request.XoaKetQuaPhuThuoc)) {
+        throw apiError('Vòng loại trực tiếp đã có kết quả phụ thuộc. Cần xác nhận xóa bracket và các kết quả phụ thuộc trước khi sửa vòng bảng.', 'DEPENDENT_RESULTS');
+      }
+      matches = matches.filter(isGroupMatch);
+    }
+
     const winnerChanged = target.MaDoiThang && String(target.MaDoiThang) !== winner;
-    if (winnerChanged) {
+    if (!groupTarget && winnerChanged) {
       const dependencies = dependentMatches(matches, target);
       const completed = dependencies.filter(match => ['HOAN_THANH', 'BO_CUOC'].indexOf(String(match.TrangThai)) >= 0);
       if (completed.length && !toBoolean(request.XoaKetQuaPhuThuoc)) {
@@ -536,7 +650,11 @@ function capNhatKetQuaTranDau(request) {
 
     target.MaDoiThang = winner; target.TySoHiep1 = scores[0]; target.TySoHiep2 = scores[1]; target.TySoHiep3 = scores[2];
     target.TrangThai = forfeit ? 'BO_CUOC' : 'HOAN_THANH'; target.GhiChu = cleanText(request.GhiChu, 500);
-    rebuildAdvancement(matches);
+    if (groupTarget) {
+      const teams = rowsForTournament('DoiThiDau', tournament.MaGiai).map(stripInternal);
+      const groupMatches = matches.filter(isGroupMatch);
+      matches = groupMatches.concat(createKnockoutAfterGroups(tournament, teams, groupMatches));
+    } else rebuildAdvancement(matches);
     replaceRows('TranDau', matches);
 
     const finalMatch = matches.find(match => String(match.Vong) === 'CHUNG_KET');
@@ -550,7 +668,7 @@ function capNhatKetQuaTranDau(request) {
 }
 
 function rebuildAdvancement(matches) {
-  const normal = matches.filter(match => String(match.Vong) !== 'TRANH_HANG_BA');
+  const normal = matches.filter(match => String(match.Vong) !== 'TRANH_HANG_BA' && !isGroupMatch(match));
   const bronze = matches.find(match => String(match.Vong) === 'TRANH_HANG_BA');
   normal.filter(match => roundNumber(match) > 1).forEach(match => { match.MaDoi1 = ''; match.MaDoi2 = ''; });
   if (bronze) { bronze.MaDoi1 = ''; bronze.MaDoi2 = ''; }

@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart3, ChevronRight, Dices, LogOut, Menu, Settings, Swords, UserCheck, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AdminGuard from '@/components/AdminGuard';
 import BrandMark from '@/components/BrandMark';
 import { callApi } from '@/lib/api';
 import type { AdminUser } from '@/lib/types';
 import { clearCachedAdminUser } from '@/lib/adminSession';
+import { prefetchApiData } from '@/hooks/useApiData';
 
 const nav = [
   { href: '/admin', label: 'Tổng quan', icon: BarChart3 },
@@ -21,6 +22,12 @@ const nav = [
 export default function AdminLayout({ children, title, description }: { children: React.ReactNode; title: string; description?: string }) {
   const pathname = usePathname(); const [user, setUser] = useState<AdminUser | null>(null); const [open, setOpen] = useState(false);
   const receiveUser = useCallback((next: AdminUser) => setUser(next), []);
+  useEffect(() => {
+    if (!user) return;
+    const actions = ['layDashboardGiaiDau', 'layDanhSachNguoiChoiQuanTri', 'layDuLieuBocTham', 'layDanhSachTranDauQuanTri'];
+    const timer = window.setTimeout(() => { actions.forEach(action => void prefetchApiData(action)); }, 350);
+    return () => window.clearTimeout(timer);
+  }, [user]);
   async function logout() { try { await callApi('dangXuat'); } finally { clearCachedAdminUser(); window.location.href = '/admin/login'; } }
   return <AdminGuard onUser={receiveUser}><div className="admin-shell">
     <aside className={open ? 'admin-sidebar open' : 'admin-sidebar'}><button className="side-close" onClick={() => setOpen(false)}><X /></button><Link href="/admin" className="admin-brand"><BrandMark /></Link><nav>{nav.map(item => <div key={item.href}>{item.group && <p>{item.group}</p>}<Link href={item.href} onClick={() => setOpen(false)} className={pathname === item.href ? 'active' : ''}><item.icon size={17} /><span>{item.label}</span>{pathname === item.href && <ChevronRight size={14} />}</Link></div>)}</nav><div className="side-foot"><small>ĐĂNG NHẬP VỚI</small><b>{user?.HoTen || 'Quản trị viên'}</b><span>{user?.VaiTro || 'ADMIN'}</span></div></aside>
