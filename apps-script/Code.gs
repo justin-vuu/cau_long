@@ -867,3 +867,36 @@ function xoaNguoiChoiMauSauKhiXacNhan() {
     return { success: true, deleted: samples.length };
   });
 }
+
+/**
+ * DỌN DỮ LIỆU TRƯỚC KHI MỞ ĐĂNG KÝ THẬT — chỉ chạy thủ công trong Apps Script.
+ * Xóa người chơi, đội, trận và nhật ký cũ; giữ nguyên giải đấu, Admin và cấu hình.
+ * Sau khi chạy, giải được đưa về trạng thái DANG_DANG_KY.
+ */
+function xoaToanBoVanDongVienVaMoDangKyLai() {
+  return withLock(() => {
+    ensureDatabaseSheetsOnly();
+    const tournament = requireTournament();
+    const counts = {
+      nguoiChoi: rowsForTournament('NguoiChoi', tournament.MaGiai).length,
+      doi: rowsForTournament('DoiThiDau', tournament.MaGiai).length,
+      tran: rowsForTournament('TranDau', tournament.MaGiai).length,
+    };
+
+    replaceRows('NguoiChoi', []);
+    replaceRows('DoiThiDau', []);
+    replaceRows('TranDau', []);
+    replaceRows('NhatKy', []);
+    updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, {
+      TrangThai: 'DANG_DANG_KY',
+      ThoiGianBocTham: '',
+      NguoiBocTham: '',
+    });
+    appendLog(tournament.MaGiai, 'SYSTEM', 'DON_DU_LIEU_MO_DANG_KY_THAT',
+      'Đã xóa ' + counts.nguoiChoi + ' người chơi, ' + counts.doi + ' đội và ' + counts.tran + ' trận đấu.');
+    bumpCacheVersion();
+    SpreadsheetApp.flush();
+    console.log('Đã dọn dữ liệu và mở đăng ký lại: ' + JSON.stringify(counts));
+    return { success: true, deleted: counts, tournamentStatus: 'DANG_DANG_KY' };
+  });
+}
