@@ -97,9 +97,42 @@ function ensureInitialAdmin() {
       VaiTro: 'ADMIN', TrangThai: 'HOAT_DONG', MatKhauHash: hashPassword(username, password),
     });
     appendLog('', username, 'TAO_ADMIN_BAN_DAU', 'Tạo tài khoản Admin ban đầu từ Script Properties.');
+    // Mật khẩu khởi tạo chỉ dùng một lần, không giữ plaintext trong Script Properties.
+    props.deleteProperty('INITIAL_ADMIN_PASSWORD');
   }
-  // Mật khẩu khởi tạo chỉ dùng một lần, không giữ plaintext trong Script Properties.
+}
+
+/**
+ * Chỉ chạy thủ công trong Apps Script khi cần khôi phục Admin ban đầu.
+ * Đọc INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD, INITIAL_ADMIN_NAME từ Script Properties.
+ * Nếu user đã tồn tại, hàm đặt lại mật khẩu; nếu chưa có, hàm tạo mới.
+ */
+function khoiTaoHoacDatLaiAdminTuProperties() {
+  const props = PropertiesService.getScriptProperties();
+  const username = String(props.getProperty('INITIAL_ADMIN_USERNAME') || '').trim().toLowerCase();
+  const password = String(props.getProperty('INITIAL_ADMIN_PASSWORD') || '');
+  const name = String(props.getProperty('INITIAL_ADMIN_NAME') || 'Quản trị viên').trim();
+  if (!username) throw new Error('Thiếu Script Property INITIAL_ADMIN_USERNAME.');
+  if (!password) throw new Error('Thiếu Script Property INITIAL_ADMIN_PASSWORD. Hãy thêm mật khẩu mới rồi chạy lại hàm này.');
+
+  ensureDatabaseSheetsOnly();
+  const existing = readRows('NguoiDung').find(user => String(user.TaiKhoan).toLowerCase() === username);
+  const record = {
+    MaNguoiDung: existing ? existing.MaNguoiDung : makeId('USR'), TaiKhoan: username, HoTen: name,
+    VaiTro: 'ADMIN', TrangThai: 'HOAT_DONG', MatKhauHash: hashPassword(username, password),
+  };
+  if (existing) updateRow('NguoiDung', 'MaNguoiDung', existing.MaNguoiDung, record);
+  else appendRow('NguoiDung', record);
+  appendLog('', username, existing ? 'DAT_LAI_MAT_KHAU_ADMIN' : 'TAO_ADMIN_THU_CONG', 'Khôi phục Admin từ Script Properties.');
+  SpreadsheetApp.flush();
   props.deleteProperty('INITIAL_ADMIN_PASSWORD');
+  console.log('Đã ' + (existing ? 'đặt lại mật khẩu' : 'tạo') + ' tài khoản Admin: ' + username);
+  return { success: true, username: username, reset: !!existing };
+}
+
+function ensureDatabaseSheetsOnly() {
+  const spreadsheet = getSpreadsheet();
+  Object.keys(SCHEMA).forEach(name => ensureSheet(spreadsheet, name, SCHEMA[name]));
 }
 
 function validateSharedSecret(provided) {

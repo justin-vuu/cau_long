@@ -26,6 +26,8 @@
 
 `INITIAL_ADMIN_PASSWORD` được hash bằng HMAC-SHA256 có pepper và tự xóa khỏi Script Properties sau khi tài khoản được tạo. Plaintext không được ghi vào Sheet. Request đầu tiên tới deployment sẽ tạo schema và Admin ban đầu; cũng có thể chọn hàm `ensureDatabase` trong editor rồi bấm **Run** một lần và cấp quyền.
 
+Nếu cần khôi phục mật khẩu Admin, đặt lại `INITIAL_ADMIN_PASSWORD` rồi chạy thủ công hàm `khoiTaoHoacDatLaiAdminTuProperties` trong editor. Hàm này tạo mới hoặc đặt lại user Admin, ghi hash vào Sheet và xóa property plaintext ngay sau đó.
+
 ## 3. Deploy Web App
 
 1. Chọn **Deploy → New deployment → Web app**.
