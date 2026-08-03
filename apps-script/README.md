@@ -45,7 +45,8 @@ Có thể mở URL `/exec` trên trình duyệt để kiểm tra health response
 - `bocThamGiaiDau` và `capNhatKetQuaTranDau` dùng `LockService.getScriptLock()`.
 - Ghi dữ liệu bốc thăm/trận đấu được thực hiện theo lô trong một critical section.
 - Mọi action ghi tăng `CACHE_VERSION`, làm vô hiệu ngay cache công khai cũ.
-- Không có seed chạy tự động. Hàm `seedDuLieuMauSauKhiDaXacNhan` cố ý ném lỗi cho tới khi người quản trị chủ động sửa sau khi xác nhận.
+- Không có seed chạy tự động hoặc nằm trong API production.
+- Khi cần kiểm thử thủ công, có thể chạy `tao31NguoiChoiMauSauKhiXacNhan` trong editor. Hàm chỉ chạy khi giải đã được tạo, danh sách người chơi trống và chưa bốc thăm; toàn bộ 31 dòng có nhãn `[TEST-31]`. Dùng `xoaNguoiChoiMauSauKhiXacNhan` để xóa riêng các dòng mẫu này.
 - Form công khai chỉ nhận tên, số điện thoại, giới tính sau khi người chơi xác nhận đã chuyển khoản. Người chơi vẫn ở trạng thái chờ; Admin phải đối soát giao dịch trước khi chuyển sang `DA_XAC_NHAN`.
 
 ## 5. Tạo giải đầu tiên

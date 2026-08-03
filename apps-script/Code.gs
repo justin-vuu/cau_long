@@ -681,9 +681,54 @@ function cleanScore(value) { const text = String(value || '').trim().replace(/[�
 function enrichTeams(teams, tournamentId) { const players = rowsForTournament('NguoiChoi', tournamentId); const map = Object.fromEntries(players.map(player => [String(player.MaNguoiChoi), pick(player, ['MaNguoiChoi', 'HoTen', 'TrinhDo'])])); return teams.map(team => Object.assign({}, stripInternal(team), { ThanhVien1: map[String(team.MaNguoiChoi1)] || null, ThanhVien2: map[String(team.MaNguoiChoi2)] || null })); }
 
 /**
- * Hàm seed cố ý KHÔNG được gọi tự động.
- * Chỉ chạy thủ công trong editor sau khi đã xác nhận rõ dữ liệu mẫu được phép ghi.
+ * TEST ONLY — tạo đúng 31 người chơi mẫu sau khi Admin chủ động bấm Run trong Apps Script.
+ * Không được gọi bởi API hoặc giao diện production. Mỗi dòng được gắn [TEST-31] để xóa an toàn.
  */
-function seedDuLieuMauSauKhiDaXacNhan() {
-  throw new Error('Seed đang bị khóa an toàn. Hãy tự sửa hàm này sau khi xác nhận rõ ràng; không dùng trong production.');
+function tao31NguoiChoiMauSauKhiXacNhan() {
+  return withLock(() => {
+    ensureDatabaseSheetsOnly();
+    const tournament = requireTournament();
+    if (rowsForTournament('DoiThiDau', tournament.MaGiai).length) throw new Error('Hãy hủy kết quả bốc thăm trước khi tạo dữ liệu test.');
+    const existing = rowsForTournament('NguoiChoi', tournament.MaGiai);
+    if (existing.length) throw new Error('Giải đã có ' + existing.length + ' người chơi. Để tránh lẫn dữ liệu thật, seed test chỉ chạy khi danh sách đang trống.');
+
+    const names = [
+      'Nguyễn Minh Anh', 'Trần Quốc Bảo', 'Lê Hoàng Nam', 'Phạm Thu Hà', 'Vũ Đức Long',
+      'Đặng Ngọc Mai', 'Bùi Gia Huy', 'Đỗ Khánh Linh', 'Hoàng Anh Tuấn', 'Ngô Thảo Vy',
+      'Dương Thành Đạt', 'Lý Bích Ngọc', 'Mai Quang Huy', 'Tạ Phương Anh', 'Chu Nhật Minh',
+      'Hồ Thanh Tâm', 'Cao Mỹ Duyên', 'La Đức Anh', 'Quách Thu Trang', 'Kiều Minh Quân',
+      'Tôn Hải Yến', 'Hà Quốc Khánh', 'Lâm Ngọc Anh', 'Vi Trọng Nghĩa', 'Châu Bảo Trâm',
+      'Thái Gia Bảo', 'Ninh Khánh Vy', 'Triệu Hoài Nam', 'Sơn Phương Thảo', 'Lưu Minh Đức',
+      'Trịnh Ngọc Hân',
+    ];
+    const levels = ['Mới chơi', 'Trung bình', 'Khá', 'Nâng cao'];
+    const now = new Date();
+    const players = names.map((name, index) => ({
+      MaNguoiChoi: 'TEST-' + String(index + 1).padStart(2, '0'), MaGiai: tournament.MaGiai,
+      HoTen: name, SoDienThoai: '090000' + String(index + 1).padStart(4, '0'),
+      GioiTinh: index % 2 ? 'Nữ' : 'Nam', TrinhDo: levels[index % levels.length],
+      CauLacBo: 'CLB Test', GhiChu: '[TEST-31] Dữ liệu mẫu, có thể xóa bằng hàm xoaNguoiChoiMauSauKhiXacNhan.',
+      TrangThai: 'DA_XAC_NHAN', ThoiGianDangKy: now, DaChuyenKhoan: true,
+    }));
+    appendRows('NguoiChoi', players);
+    appendLog(tournament.MaGiai, 'SYSTEM', 'TAO_31_NGUOI_CHOI_TEST', 'Tạo 31 người mẫu đã xác nhận.');
+    bumpCacheVersion(); SpreadsheetApp.flush();
+    return { success: true, created: players.length };
+  });
+}
+
+/** TEST ONLY — chỉ xóa dòng được gắn [TEST-31], không xóa người chơi thật. */
+function xoaNguoiChoiMauSauKhiXacNhan() {
+  return withLock(() => {
+    ensureDatabaseSheetsOnly();
+    const tournament = requireTournament();
+    if (rowsForTournament('DoiThiDau', tournament.MaGiai).length) throw new Error('Hãy hủy kết quả bốc thăm trước khi xóa dữ liệu test.');
+    const players = rowsForTournament('NguoiChoi', tournament.MaGiai);
+    const samples = players.filter(player => String(player.GhiChu).indexOf('[TEST-31]') === 0);
+    if (!samples.length) throw new Error('Không tìm thấy dữ liệu mẫu [TEST-31] để xóa.');
+    replaceRows('NguoiChoi', readRows('NguoiChoi').filter(player => String(player.GhiChu).indexOf('[TEST-31]') !== 0).map(stripInternal));
+    appendLog(tournament.MaGiai, 'SYSTEM', 'XOA_31_NGUOI_CHOI_TEST', 'Xóa ' + samples.length + ' người mẫu [TEST-31].');
+    bumpCacheVersion(); SpreadsheetApp.flush();
+    return { success: true, deleted: samples.length };
+  });
 }
