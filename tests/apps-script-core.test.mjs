@@ -48,7 +48,7 @@ test('kiểm tra tỷ số từ chối đội thắng không khớp', () => {
   assert.throws(() => evaluate(`validateScores(['21-18','18-21','21-17'], {MaDoi1:'A', MaDoi2:'B'}, 'B')`), /không khớp/);
 });
 
-test('chia bảng linh hoạt tạo đúng số trận vòng tròn', () => {
+test('14 đội chia đúng 4 bảng 4-4-3-3 và tạo 18 trận vòng tròn', () => {
   const result = evaluate(`(() => {
     const build = count => {
       const teams = Array.from({length:count}, (_, i) => ({MaDoi:'D'+(i+1), MaGiai:'G1'}));
@@ -56,19 +56,37 @@ test('chia bảng linh hoạt tạo đúng số trận vòng tròn', () => {
       teams.forEach((team, index) => team.BangDau = String.fromCharCode(65 + index % groups));
       return {groups, matches:createGroupStageMatches({MaGiai:'G1'}, teams, groups).length};
     };
-    return {n16:build(16), n12:build(12), n10:build(10), n6:build(6), n4:build(4)};
+    const teams = Array.from({length:14}, (_, i) => ({MaDoi:'D'+(i+1), MaGiai:'G1'}));
+    const groups = determineGroupCount(teams.length);
+    teams.forEach((team, index) => team.BangDau = String.fromCharCode(65 + index % groups));
+    const sizes = ['A','B','C','D'].map(code => teams.filter(team => team.BangDau === code).length);
+    return {groups, sizes, matches:createGroupStageMatches({MaGiai:'G1'}, teams, groups).length};
   })()`);
-  assert.equal(JSON.stringify(result), JSON.stringify({
-    n16: { groups: 4, matches: 24 }, n12: { groups: 4, matches: 12 },
-    n10: { groups: 2, matches: 20 }, n6: { groups: 2, matches: 6 }, n4: { groups: 1, matches: 6 },
-  }));
+  assert.equal(JSON.stringify(result), JSON.stringify({ groups: 4, sizes: [4, 4, 3, 3], matches: 18 }));
 });
 
-test('32 người -> 16 đội -> 4 bảng -> top 8 -> tứ kết đi tiếp', () => {
+test('xếp hạng vòng bảng theo điểm thắng rồi hiệu số hiệp và hiệu số điểm', () => {
+  const result = evaluate(`(() => {
+    const teams = ['A','B','C'].map(id => ({MaDoi:id, BangDau:'A', TenHienThi:'Đội '+id}));
+    const matches = [
+      {Vong:'VONG_BANG_A', MaDoi1:'A', MaDoi2:'B', MaDoiThang:'A', TySoHiep1:'21-10', TySoHiep2:'21-10', TySoHiep3:'', TrangThai:'HOAN_THANH'},
+      {Vong:'VONG_BANG_A', MaDoi1:'B', MaDoi2:'C', MaDoiThang:'B', TySoHiep1:'21-19', TySoHiep2:'21-19', TySoHiep3:'', TrangThai:'HOAN_THANH'},
+      {Vong:'VONG_BANG_A', MaDoi1:'C', MaDoi2:'A', MaDoiThang:'C', TySoHiep1:'21-19', TySoHiep2:'21-19', TySoHiep3:'', TrangThai:'HOAN_THANH'},
+    ];
+    return calculateGroupStandings(teams, matches).A.map(row => ({id:row.MaDoi, diem:row.DiemXepHang, hsHiep:row.HieuSoHiep, hsDiem:row.HieuSoDiem}));
+  })()`);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [
+    { id: 'A', diem: 1, hsHiep: 0, hsDiem: 18 },
+    { id: 'C', diem: 1, hsHiep: 0, hsDiem: 0 },
+    { id: 'B', diem: 1, hsHiep: 0, hsDiem: -18 },
+  ]);
+});
+
+test('28 người -> 14 đội -> 4 bảng 4-4-3-3 -> top 8 -> tứ kết đi tiếp', () => {
   const result = evaluate(`(() => {
     const memory = {
-      tournament: {MaGiai:'G1', TenGiai:'Giải test', TrangThai:'DA_KHOA_DANG_KY', SoNguoiToiThieu:32, CoTranhHangBa:false},
-      NguoiChoi: Array.from({length:32}, (_, i) => ({MaNguoiChoi:'NC'+(i+1), MaGiai:'G1', HoTen:'Người '+(i+1), TrinhDo:'Chưa phân loại', TrangThai:'DA_XAC_NHAN', DaChuyenKhoan:true})),
+      tournament: {MaGiai:'G1', TenGiai:'Giải test', TrangThai:'DA_KHOA_DANG_KY', SoNguoiToiThieu:28, CoTranhHangBa:false},
+      NguoiChoi: Array.from({length:28}, (_, i) => ({MaNguoiChoi:'NC'+(i+1), MaGiai:'G1', HoTen:'Người '+(i+1), TrinhDo:'Chưa phân loại', TrangThai:'DA_XAC_NHAN', DaChuyenKhoan:true})),
       DoiThiDau: [], TranDau: []
     };
     getTournament = () => memory.tournament;
@@ -97,10 +115,10 @@ test('32 người -> 16 đội -> 4 bảng -> top 8 -> tứ kết đi tiếp', (
     const nextWinnerSlot = Number(saved.ViTriVaoTranTiepTheo) === 1 ? next.MaDoi1 : next.MaDoi2;
     return {draw, teams:memory.DoiThiDau.length, groupMatches:memory.TranDau.filter(isGroupMatch).length, knockoutMatches:memory.TranDau.filter(m => !isGroupMatch(m)).length, savedStatus:saved.TrangThai, nextWinnerSlot, winner, tournamentStatus:memory.tournament.TrangThai};
   })()`);
-  assert.equal(result.draw.teamsCreated, 16);
+  assert.equal(result.draw.teamsCreated, 14);
   assert.equal(result.draw.groupCount, 4);
-  assert.equal(result.teams, 16);
-  assert.equal(result.groupMatches, 24);
+  assert.equal(result.teams, 14);
+  assert.equal(result.groupMatches, 18);
   assert.equal(result.knockoutMatches, 7);
   assert.equal(result.savedStatus, 'HOAN_THANH');
   assert.equal(result.nextWinnerSlot, result.winner);

@@ -12,7 +12,8 @@ const SCHEMA = {
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
-const DATABASE_SCHEMA_VERSION = '2026-08-03.3';
+const DATABASE_SCHEMA_VERSION = '2026-08-12.1';
+const TOURNAMENT_MINIMUM_PLAYERS = 28;
 let spreadsheetInstance = null;
 
 const PUBLIC_ACTIONS = new Set([
@@ -141,6 +142,10 @@ function khoiTaoHoacDatLaiAdminTuProperties() {
 function ensureDatabaseSheetsOnly() {
   const spreadsheet = getSpreadsheet();
   Object.keys(SCHEMA).forEach(name => ensureSheet(spreadsheet, name, SCHEMA[name]));
+  const tournament = getTournament();
+  if (tournament && Number(tournament.SoNguoiToiThieu) !== TOURNAMENT_MINIMUM_PLAYERS) {
+    updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, { SoNguoiToiThieu: TOURNAMENT_MINIMUM_PLAYERS });
+  }
   PropertiesService.getScriptProperties().setProperty('DATABASE_SCHEMA_VERSION', DATABASE_SCHEMA_VERSION);
 }
 
@@ -221,7 +226,7 @@ function luuGiaiDau(request) {
     MaGiai: existing ? existing.MaGiai : makeId('GIAI'), TenGiai: name, DiaDiem: location,
     NgayBatDau: start, HanDangKy: deadline,
     TrangThai: existing ? existing.TrangThai : 'DANG_DANG_KY',
-    SoNguoiToiThieu: Math.max(6, Number(input.SoNguoiToiThieu) || 32),
+    SoNguoiToiThieu: TOURNAMENT_MINIMUM_PLAYERS,
     CoTranhHangBa: toBoolean(input.CoTranhHangBa),
     ThoiGianBocTham: existing ? existing.ThoiGianBocTham : '', NguoiBocTham: existing ? existing.NguoiBocTham : '',
   };
@@ -349,8 +354,8 @@ function validatePlayer(input, tournamentId, excludeId, isAdmin) {
 function khoaDangKy(request) {
   const tournament = requireTournament(); assertRosterEditable(tournament);
   const validCount = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN').length;
-  const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
-  if (validCount < minimum) throw apiError('Cần ít nhất ' + minimum + ' người đã xác nhận để khóa đăng ký.', 'DRAW_CONDITION');
+  const minimum = TOURNAMENT_MINIMUM_PLAYERS;
+  if (validCount !== minimum) throw apiError('Giải này cần đúng ' + minimum + ' người đã xác nhận để tạo 14 đội.', 'DRAW_CONDITION');
   if (validCount % 2 !== 0) throw apiError('Số người hợp lệ phải là số chẵn.', 'DRAW_CONDITION');
   updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, { TrangThai: 'DA_KHOA_DANG_KY' });
   appendLog(tournament.MaGiai, request._user.TaiKhoan, 'KHOA_DANG_KY', validCount + ' người hợp lệ.');
@@ -374,11 +379,11 @@ function layDuLieuBocTham() {
   const tournament = requireTournament();
   const eligiblePlayers = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN');
   const teams = rowsForTournament('DoiThiDau', tournament.MaGiai);
-  const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
+  const minimum = TOURNAMENT_MINIMUM_PLAYERS;
   let reason = '';
   if (teams.length) reason = 'Giải đã có kết quả bốc thăm.';
   else if (String(tournament.TrangThai) !== 'DA_KHOA_DANG_KY') reason = 'Cần khóa đăng ký trước khi bốc thăm.';
-  else if (eligiblePlayers.length < minimum) reason = 'Cần ít nhất ' + minimum + ' người hợp lệ.';
+  else if (eligiblePlayers.length !== minimum) reason = 'Cần đúng ' + minimum + ' người hợp lệ để tạo 14 đội.';
   else if (eligiblePlayers.length % 2) reason = 'Số người hợp lệ phải là số chẵn.';
   return { tournament, eligiblePlayers, teams, canDraw: !reason, reason };
 }
@@ -389,8 +394,8 @@ function bocThamGiaiDau(request) {
     if (String(tournament.TrangThai) !== 'DA_KHOA_DANG_KY') throw apiError('Cần khóa đăng ký trước khi bốc thăm.', 'DRAW_CONDITION');
     if (rowsForTournament('DoiThiDau', tournament.MaGiai).length) throw apiError('Giải đã bốc thăm. Hãy hủy kết quả trước khi thực hiện lại.', 'ALREADY_DRAWN');
     const players = rowsForTournament('NguoiChoi', tournament.MaGiai).filter(player => String(player.TrangThai) === 'DA_XAC_NHAN');
-    const minimum = Math.max(6, Number(tournament.SoNguoiToiThieu) || 32);
-    if (players.length < minimum || players.length % 2) throw apiError('Danh sách phải có ít nhất ' + minimum + ' người hợp lệ và là số chẵn.', 'DRAW_CONDITION');
+    const minimum = TOURNAMENT_MINIMUM_PLAYERS;
+    if (players.length !== minimum) throw apiError('Danh sách phải có đúng ' + minimum + ' người hợp lệ để tạo 14 đội.', 'DRAW_CONDITION');
 
     fisherYates(players);
     const teams = [];
@@ -566,7 +571,7 @@ function calculateGroupStandings(teams, groupMatches) {
     const groupTeams = teams.filter(team => String(team.BangDau) === code);
     const matches = groupMatches.filter(match => groupCodeFromMatch(match) === code);
     const rows = Object.fromEntries(groupTeams.map(team => [String(team.MaDoi), {
-      ThuHang: 0, MaDoi: team.MaDoi, Doi: team, SoTran: 0, Thang: 0, Thua: 0,
+      ThuHang: 0, MaDoi: team.MaDoi, Doi: team, SoTran: 0, Thang: 0, Thua: 0, DiemXepHang: 0,
       HiepThang: 0, HiepThua: 0, HieuSoHiep: 0, DiemThang: 0, DiemThua: 0, HieuSoDiem: 0, DaDuDieuKien: false,
     }]));
     matches.filter(isCompletedMatch).forEach(match => {
@@ -585,9 +590,10 @@ function calculateGroupStandings(teams, groupMatches) {
     });
     const groupCompleted = matches.length > 0 && matches.every(isCompletedMatch);
     const sorted = Object.values(rows).map(row => {
+      row.DiemXepHang = row.Thang;
       row.HieuSoHiep = row.HiepThang - row.HiepThua; row.HieuSoDiem = row.DiemThang - row.DiemThua; return row;
     }).sort((a, b) => {
-      if (b.Thang !== a.Thang) return b.Thang - a.Thang;
+      if (b.DiemXepHang !== a.DiemXepHang) return b.DiemXepHang - a.DiemXepHang;
       if (b.HieuSoHiep !== a.HieuSoHiep) return b.HieuSoHiep - a.HieuSoHiep;
       if (b.HieuSoDiem !== a.HieuSoDiem) return b.HieuSoDiem - a.HieuSoDiem;
       const direct = matches.find(match => isCompletedMatch(match) && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(a.MaDoi)) >= 0 && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(b.MaDoi)) >= 0);

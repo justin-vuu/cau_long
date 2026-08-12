@@ -6,8 +6,8 @@
 
 - Trang công khai: thông tin giải, QR chuyển khoản, đăng ký bằng tên/SĐT/giới tính, danh sách người chơi (ẩn SĐT), danh sách đội, bracket và tỷ số trực tiếp.
 - Admin: phiên đăng nhập HttpOnly, tạo/cấu hình giải, CRUD/xác nhận người chơi, CSV, khóa/mở đăng ký.
-- Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi và chia bảng cân bằng. 12–16 đội có 4 bảng lấy top 2 vào tứ kết; 6–11 đội có 2 bảng lấy top 2 vào bán kết; 3–5 đội lấy top 2 vào chung kết.
-- Vòng bảng tính thứ hạng theo số trận thắng, hiệu số hiệp, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
+- Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi và chia bảng cân bằng. 28 người được bốc ngẫu nhiên thành 14 đội, chia 4 bảng 4–4–3–3 và lấy hai đội đầu mỗi bảng vào tứ kết.
+- Mỗi trận thắng được 1 điểm; vòng bảng xếp hạng theo điểm, hiệu số hiệp, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
 - Nhập tối đa ba hiệp, chọn đội thắng, bỏ cuộc, tự đẩy đội thắng; bảo vệ kết quả phụ thuộc và hỗ trợ tranh hạng ba.
 - Google Sheet là nguồn dữ liệu production duy nhất; không có mock fallback.
 
@@ -52,14 +52,14 @@ npm run test:core
 npm run build
 ```
 
-`test:core` chạy thuật toán và handler thật trong `Code.gs`: kiểm tra bracket 18 đội/32 vị trí với 14 BYE, cùng luồng 32 đăng ký đã thanh toán → 16 đội → nhập tỷ số → đội thắng đi tiếp.
+`test:core` chạy thuật toán và handler thật trong `Code.gs`: kiểm tra bracket 18 đội/32 vị trí với 14 BYE, cùng luồng 28 đăng ký đã thanh toán → 14 đội → nhập tỷ số → đội thắng đi tiếp.
 
 Smoke test với deployment thật:
 
 1. Tạo giải trong `/admin/cai-dat`.
-2. Đăng ký hoặc thêm ít nhất 32 người, xác nhận đủ và bảo đảm số chẵn.
+2. Đăng ký hoặc thêm đúng 28 người, xác nhận đủ và bảo đảm số chẵn.
 3. Khóa đăng ký, vào `/admin/boc-tham`, xác nhận bốc thăm.
-4. Kiểm tra 16 đội và bracket 16 đội trên trang công khai.
+4. Kiểm tra 14 đội chia bảng 4–4–3–3 trên trang công khai.
 5. Vào `/admin/tran-dau`, nhập `21-18`, `18-21`, `21-17`, chọn đội 1 và lưu.
 6. Mở `/bang-dau`: đội thắng phải xuất hiện ở vòng tiếp theo.
 7. Reload cả Admin và trang công khai để xác nhận dữ liệu vẫn còn trong Sheet.
