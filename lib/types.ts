@@ -57,9 +57,6 @@ export interface GroupStanding {
   Thang: number;
   Thua: number;
   DiemXepHang: number;
-  HiepThang: number;
-  HiepThua: number;
-  HieuSoHiep: number;
   DiemThang: number;
   DiemThua: number;
   HieuSoDiem: number;

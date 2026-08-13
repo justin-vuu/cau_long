@@ -45,7 +45,37 @@ test('32 người thành 16 đội, đội thắng tự xuất hiện ở vòng 
 });
 
 test('kiểm tra tỷ số từ chối đội thắng không khớp', () => {
-  assert.throws(() => evaluate(`validateScores(['21-18','18-21','21-17'], {MaDoi1:'A', MaDoi2:'B'}, 'B')`), /không khớp/);
+  assert.throws(() => evaluate(`validateScores(['21-18','',''], {Vong:'VONG_BANG_A', MaDoi1:'A', MaDoi2:'B'}, 'B')`), /không khớp/);
+});
+
+test('kiểm tra luật một set vòng bảng 21 trần 25 và vòng trong 25 trần 31', () => {
+  assert.doesNotThrow(() => evaluate(`validateScores(['21-19','',''], {Vong:'VONG_BANG_A', MaDoi1:'A', MaDoi2:'B'}, 'A')`));
+  assert.doesNotThrow(() => evaluate(`validateScores(['25-24','',''], {Vong:'VONG_BANG_A', MaDoi1:'A', MaDoi2:'B'}, 'A')`));
+  assert.throws(() => evaluate(`validateScores(['21-20','',''], {Vong:'VONG_BANG_A', MaDoi1:'A', MaDoi2:'B'}, 'A')`), /trần 25/);
+  assert.doesNotThrow(() => evaluate(`validateScores(['25-23','',''], {Vong:'TU_KET', MaDoi1:'A', MaDoi2:'B'}, 'A')`));
+  assert.doesNotThrow(() => evaluate(`validateScores(['31-30','',''], {Vong:'TU_KET', MaDoi1:'A', MaDoi2:'B'}, 'A')`));
+  assert.throws(() => evaluate(`validateScores(['25-24','',''], {Vong:'TU_KET', MaDoi1:'A', MaDoi2:'B'}, 'A')`), /trần 31/);
+});
+
+test('tứ kết bắt cặp chéo bảng và bán kết TK1-TK3, TK2-TK4', () => {
+  const result = evaluate(`(() => {
+    const teams = ['A1','A2','B1','B2','C1','C2','D1','D2'].map(id => ({MaDoi:id, BangDau:id[0]}));
+    const standings = {A:[teams[0],teams[1]], B:[teams[2],teams[3]], C:[teams[4],teams[5]], D:[teams[6],teams[7]]};
+    const originalCalculate = calculateGroupStandings;
+    calculateGroupStandings = () => Object.fromEntries(Object.entries(standings).map(([code,list]) => [code,list.map(Doi => ({Doi}))]));
+    const groupMatches = [{Vong:'VONG_BANG_A',TrangThai:'HOAN_THANH'}];
+    const knockout = createKnockoutAfterGroups({MaGiai:'G1',CoTranhHangBa:false}, teams, groupMatches);
+    const q = knockout.filter(m => roundNumber(m) === 1).sort((a,b) => a.ThuTuTran-b.ThuTuTran);
+    const output = q.map(m => ({pair:m.MaDoi1+'-'+m.MaDoi2,next:m.MaTranTiepTheo,slot:m.ViTriVaoTranTiepTheo}));
+    calculateGroupStandings = originalCalculate;
+    return output;
+  })()`);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [
+    { pair:'A1-B2', next:'T-R2-01', slot:1 },
+    { pair:'B1-A2', next:'T-R2-02', slot:1 },
+    { pair:'C1-D2', next:'T-R2-01', slot:2 },
+    { pair:'D1-C2', next:'T-R2-02', slot:2 },
+  ]);
 });
 
 test('14 đội chia đúng 4 bảng 4-4-3-3 và tạo 18 trận vòng tròn', () => {
@@ -65,7 +95,7 @@ test('14 đội chia đúng 4 bảng 4-4-3-3 và tạo 18 trận vòng tròn', (
   assert.equal(JSON.stringify(result), JSON.stringify({ groups: 4, sizes: [4, 4, 3, 3], matches: 18 }));
 });
 
-test('xếp hạng vòng bảng theo điểm thắng rồi hiệu số hiệp và hiệu số điểm', () => {
+test('xếp hạng vòng bảng theo điểm thắng rồi hiệu số điểm, không dùng hiệu số hiệp', () => {
   const result = evaluate(`(() => {
     const teams = ['A','B','C'].map(id => ({MaDoi:id, BangDau:'A', TenHienThi:'Đội '+id}));
     const matches = [
@@ -73,12 +103,12 @@ test('xếp hạng vòng bảng theo điểm thắng rồi hiệu số hiệp v�
       {Vong:'VONG_BANG_A', MaDoi1:'B', MaDoi2:'C', MaDoiThang:'B', TySoHiep1:'21-19', TySoHiep2:'21-19', TySoHiep3:'', TrangThai:'HOAN_THANH'},
       {Vong:'VONG_BANG_A', MaDoi1:'C', MaDoi2:'A', MaDoiThang:'C', TySoHiep1:'21-19', TySoHiep2:'21-19', TySoHiep3:'', TrangThai:'HOAN_THANH'},
     ];
-    return calculateGroupStandings(teams, matches).A.map(row => ({id:row.MaDoi, diem:row.DiemXepHang, hsHiep:row.HieuSoHiep, hsDiem:row.HieuSoDiem}));
+    return calculateGroupStandings(teams, matches).A.map(row => ({id:row.MaDoi, diem:row.DiemXepHang, hsDiem:row.HieuSoDiem, coHsHiep:Object.hasOwn(row, 'HieuSoHiep')}));
   })()`);
   assert.deepEqual(JSON.parse(JSON.stringify(result)), [
-    { id: 'A', diem: 1, hsHiep: 0, hsDiem: 18 },
-    { id: 'C', diem: 1, hsHiep: 0, hsDiem: 0 },
-    { id: 'B', diem: 1, hsHiep: 0, hsDiem: -18 },
+    { id: 'A', diem: 1, hsDiem: 9, coHsHiep: false },
+    { id: 'C', diem: 1, hsDiem: 0, coHsHiep: false },
+    { id: 'B', diem: 1, hsDiem: -9, coHsHiep: false },
   ]);
 });
 
@@ -101,14 +131,14 @@ test('28 người -> 14 đội -> 4 bảng 4-4-3-3 -> top 8 -> tứ kết đi ti
       const match = memory.TranDau.find(item => item.MaTran === id);
       capNhatKetQuaTranDau({
         _user:{TaiKhoan:'admin'}, MaTran:id, MaDoiThang:match.MaDoi1,
-        TySoHiep1:'21-18', TySoHiep2:'21-17', TySoHiep3:'', GhiChu:'', BoCuoc:false
+        TySoHiep1:'21-18', TySoHiep2:'', TySoHiep3:'', GhiChu:'', BoCuoc:false
       });
     });
     const first = memory.TranDau.find(match => !isGroupMatch(match) && roundNumber(match) === 1);
     const winner = first.MaDoi1;
     capNhatKetQuaTranDau({
       _user:{TaiKhoan:'admin'}, MaTran:first.MaTran, MaDoiThang:winner,
-      TySoHiep1:'21-18', TySoHiep2:'18-21', TySoHiep3:'21-17', GhiChu:'', BoCuoc:false
+      TySoHiep1:'25-18', TySoHiep2:'', TySoHiep3:'', GhiChu:'', BoCuoc:false
     });
     const saved = memory.TranDau.find(match => match.MaTran === first.MaTran);
     const next = memory.TranDau.find(match => match.MaTran === saved.MaTranTiepTheo);

@@ -572,7 +572,7 @@ function calculateGroupStandings(teams, groupMatches) {
     const matches = groupMatches.filter(match => groupCodeFromMatch(match) === code);
     const rows = Object.fromEntries(groupTeams.map(team => [String(team.MaDoi), {
       ThuHang: 0, MaDoi: team.MaDoi, Doi: team, SoTran: 0, Thang: 0, Thua: 0, DiemXepHang: 0,
-      HiepThang: 0, HiepThua: 0, HieuSoHiep: 0, DiemThang: 0, DiemThua: 0, HieuSoDiem: 0, DaDuDieuKien: false,
+      DiemThang: 0, DiemThua: 0, HieuSoDiem: 0, DaDuDieuKien: false,
     }]));
     matches.filter(isCompletedMatch).forEach(match => {
       const row1 = rows[String(match.MaDoi1)]; const row2 = rows[String(match.MaDoi2)];
@@ -580,21 +580,18 @@ function calculateGroupStandings(teams, groupMatches) {
       row1.SoTran++; row2.SoTran++;
       if (String(match.MaDoiThang) === String(match.MaDoi1)) { row1.Thang++; row2.Thua++; }
       else if (String(match.MaDoiThang) === String(match.MaDoi2)) { row2.Thang++; row1.Thua++; }
-      [match.TySoHiep1, match.TySoHiep2, match.TySoHiep3].filter(Boolean).forEach(score => {
+      [match.TySoHiep1].filter(Boolean).forEach(score => {
         const pair = String(score).split('-').map(Number);
         row1.DiemThang += pair[0] || 0; row1.DiemThua += pair[1] || 0;
         row2.DiemThang += pair[1] || 0; row2.DiemThua += pair[0] || 0;
-        if (pair[0] > pair[1]) { row1.HiepThang++; row2.HiepThua++; }
-        else { row2.HiepThang++; row1.HiepThua++; }
       });
     });
     const groupCompleted = matches.length > 0 && matches.every(isCompletedMatch);
     const sorted = Object.values(rows).map(row => {
       row.DiemXepHang = row.Thang;
-      row.HieuSoHiep = row.HiepThang - row.HiepThua; row.HieuSoDiem = row.DiemThang - row.DiemThua; return row;
+      row.HieuSoDiem = row.DiemThang - row.DiemThua; return row;
     }).sort((a, b) => {
       if (b.DiemXepHang !== a.DiemXepHang) return b.DiemXepHang - a.DiemXepHang;
-      if (b.HieuSoHiep !== a.HieuSoHiep) return b.HieuSoHiep - a.HieuSoHiep;
       if (b.HieuSoDiem !== a.HieuSoDiem) return b.HieuSoDiem - a.HieuSoDiem;
       const direct = matches.find(match => isCompletedMatch(match) && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(a.MaDoi)) >= 0 && [String(match.MaDoi1), String(match.MaDoi2)].indexOf(String(b.MaDoi)) >= 0);
       if (direct) return String(direct.MaDoiThang) === String(a.MaDoi) ? -1 : 1;
@@ -613,11 +610,24 @@ function createKnockoutAfterGroups(tournament, teams, groupMatches) {
   const qualified = {};
   codes.forEach(code => { qualified[code + '1'] = standings[code][0] && standings[code][0].Doi; qualified[code + '2'] = standings[code][1] && standings[code][1].Doi; });
   let seedKeys;
-  if (codes.length === 4) seedKeys = ['A1', 'B2', 'C1', 'D2', 'B1', 'A2', 'D1', 'C2'];
+  if (codes.length === 4) seedKeys = ['A1', 'B2', 'B1', 'A2', 'C1', 'D2', 'D1', 'C2'];
   else if (codes.length === 2) seedKeys = ['A1', 'B2', 'B1', 'A2'];
   else seedKeys = ['A1', 'A2'];
   const slots = seedKeys.map(key => qualified[key]).filter(Boolean);
-  return createBracketMatches(tournament, slots, slots.length);
+  const knockout = createBracketMatches(tournament, slots, slots.length);
+  if (codes.length === 4) wireQuarterfinalCrossSemifinals(knockout);
+  return knockout;
+}
+
+// TK1 gặp TK3, TK2 gặp TK4 để hai đội cùng bảng chỉ có thể tái đấu ở chung kết.
+function wireQuarterfinalCrossSemifinals(matches) {
+  const quarters = matches.filter(match => roundNumber(match) === 1).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran));
+  const semis = matches.filter(match => roundNumber(match) === 2).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran));
+  if (quarters.length !== 4 || semis.length !== 2) return;
+  [[0, 0, 1], [2, 0, 2], [1, 1, 1], [3, 1, 2]].forEach(mapping => {
+    quarters[mapping[0]].MaTranTiepTheo = semis[mapping[1]].MaTran;
+    quarters[mapping[0]].ViTriVaoTranTiepTheo = mapping[2];
+  });
 }
 
 function capNhatKetQuaTranDau(request) {
@@ -712,11 +722,17 @@ function clearMatchResult(match) {
 
 function validateScores(scores, match, winner) {
   const completed = scores.filter(Boolean);
-  if (completed.length < 2) throw apiError('Cần nhập ít nhất hai hiệp hoặc đánh dấu bỏ cuộc.', 'VALIDATION_ERROR');
-  let wins1 = 0; let wins2 = 0;
-  completed.forEach(score => { const pair = score.split('-').map(Number); if (pair[0] === pair[1]) throw apiError('Tỷ số một hiệp không thể hòa.', 'VALIDATION_ERROR'); if (pair[0] > pair[1]) wins1++; else wins2++; });
-  const scoreWinner = wins1 > wins2 ? String(match.MaDoi1) : String(match.MaDoi2);
-  if (Math.max(wins1, wins2) < 2) throw apiError('Đội thắng phải thắng ít nhất hai hiệp.', 'VALIDATION_ERROR');
+  if (completed.length !== 1 || scores[1] || scores[2]) throw apiError('Mỗi trận chỉ nhập một set hoặc đánh dấu bỏ cuộc.', 'VALIDATION_ERROR');
+  const pair = completed[0].split('-').map(Number);
+  const high = Math.max(pair[0], pair[1]); const low = Math.min(pair[0], pair[1]);
+  const target = isGroupMatch(match) ? 21 : 25; const cap = isGroupMatch(match) ? 25 : 31;
+  const validNormal = high === target && high - low >= 2;
+  const validDeuce = high > target && high < cap && high - low === 2;
+  const validCap = high === cap && low === cap - 1;
+  if (pair[0] === pair[1] || high > cap || !(validNormal || validDeuce || validCap)) {
+    throw apiError(isGroupMatch(match) ? 'Vòng bảng đánh 1 set 21, hơn 2 điểm và chạm trần 25.' : 'Vòng loại trực tiếp đánh 1 set 25, hơn 2 điểm và chạm trần 31.', 'VALIDATION_ERROR');
+  }
+  const scoreWinner = pair[0] > pair[1] ? String(match.MaDoi1) : String(match.MaDoi2);
   if (scoreWinner !== winner) throw apiError('Đội thắng được chọn không khớp với tỷ số.', 'VALIDATION_ERROR');
 }
 

@@ -7,8 +7,8 @@
 - Trang công khai: thông tin giải, QR chuyển khoản, đăng ký bằng tên/SĐT/giới tính, danh sách người chơi (ẩn SĐT), danh sách đội, bracket và tỷ số trực tiếp.
 - Admin: phiên đăng nhập HttpOnly, tạo/cấu hình giải, CRUD/xác nhận người chơi, CSV, khóa/mở đăng ký.
 - Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi và chia bảng cân bằng. 28 người được bốc ngẫu nhiên thành 14 đội, chia 4 bảng 4–4–3–3 và lấy hai đội đầu mỗi bảng vào tứ kết.
-- Mỗi trận thắng được 1 điểm; vòng bảng xếp hạng theo điểm, hiệu số hiệp, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
-- Nhập tối đa ba hiệp, chọn đội thắng, bỏ cuộc, tự đẩy đội thắng; bảo vệ kết quả phụ thuộc và hỗ trợ tranh hạng ba.
+- Mỗi trận thắng được 1 điểm; vòng bảng xếp hạng theo điểm, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
+- Nhập một set theo luật từng giai đoạn, chọn đội thắng, bỏ cuộc, tự đẩy đội thắng; bảo vệ kết quả phụ thuộc và hỗ trợ tranh hạng ba.
 - Google Sheet là nguồn dữ liệu production duy nhất; không có mock fallback.
 
 ## Chạy local
@@ -60,7 +60,7 @@ Smoke test với deployment thật:
 2. Đăng ký hoặc thêm đúng 28 người, xác nhận đủ và bảo đảm số chẵn.
 3. Khóa đăng ký, vào `/admin/boc-tham`, xác nhận bốc thăm.
 4. Kiểm tra 14 đội chia bảng 4–4–3–3 trên trang công khai.
-5. Vào `/admin/tran-dau`, nhập `21-18`, `18-21`, `21-17`, chọn đội 1 và lưu.
+5. Vào `/admin/tran-dau`, nhập `21-18` ở vòng bảng hoặc `25-18` ở vòng trong, chọn đội 1 và lưu.
 6. Mở `/bang-dau`: đội thắng phải xuất hiện ở vòng tiếp theo.
 7. Reload cả Admin và trang công khai để xác nhận dữ liệu vẫn còn trong Sheet.
 8. Dùng `git grep -nE '(script.google.com/macros/s/[^D]|APP_SHARED_SECRET=.{32})'` để rà soát trước khi push; `.env.example` chỉ chứa placeholder.
