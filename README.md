@@ -8,6 +8,7 @@
 - Admin: phiên đăng nhập HttpOnly, tạo/cấu hình giải, CRUD/xác nhận người chơi, CSV, khóa/mở đăng ký.
 - Bốc thăm backend bằng Fisher–Yates hai lần, ghép đôi và chia bảng cân bằng. 28 người được bốc ngẫu nhiên thành 14 đội, chia 4 bảng 4–4–3–3 và lấy hai đội đầu mỗi bảng vào tứ kết.
 - Mỗi trận thắng được 1 điểm; vòng bảng xếp hạng theo điểm, hiệu số điểm rồi đối đầu trực tiếp. Bracket được tạo tự động sau khi vòng bảng hoàn tất.
+- Tứ kết: A1–C2, C1–A2, B1–D2, D1–B2. Bán kết: thắng TK1–TK2 và thắng TK3–TK4.
 - Nhập một set theo luật từng giai đoạn, chọn đội thắng, bỏ cuộc, tự đẩy đội thắng; bảo vệ kết quả phụ thuộc và hỗ trợ tranh hạng ba.
 - Google Sheet là nguồn dữ liệu production duy nhất; không có mock fallback.
 

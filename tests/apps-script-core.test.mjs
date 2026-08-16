@@ -63,7 +63,7 @@ test('cột tỷ số được ép kiểu văn bản để Google Sheets không 
   assert.match(source, /if \(sheetName === 'TranDau'\) formatScoreColumnsAsText\(sheet\)/);
 });
 
-test('tứ kết bắt cặp chéo bảng và bán kết TK1-TK3, TK2-TK4', () => {
+test('tứ kết A-C, B-D và bán kết TK1-TK2, TK3-TK4', () => {
   const result = evaluate(`(() => {
     const teams = ['A1','A2','B1','B2','C1','C2','D1','D2'].map(id => ({MaDoi:id, BangDau:id[0]}));
     const standings = {A:[teams[0],teams[1]], B:[teams[2],teams[3]], C:[teams[4],teams[5]], D:[teams[6],teams[7]]};
@@ -77,10 +77,10 @@ test('tứ kết bắt cặp chéo bảng và bán kết TK1-TK3, TK2-TK4', () =
     return output;
   })()`);
   assert.deepEqual(JSON.parse(JSON.stringify(result)), [
-    { pair:'A1-B2', next:'T-R2-01', slot:1 },
-    { pair:'B1-A2', next:'T-R2-02', slot:1 },
-    { pair:'C1-D2', next:'T-R2-01', slot:2 },
-    { pair:'D1-C2', next:'T-R2-02', slot:2 },
+    { pair:'A1-C2', next:'T-R2-01', slot:1 },
+    { pair:'C1-A2', next:'T-R2-01', slot:2 },
+    { pair:'B1-D2', next:'T-R2-02', slot:1 },
+    { pair:'D1-B2', next:'T-R2-02', slot:2 },
   ]);
 });
 
@@ -116,6 +116,30 @@ test('xếp hạng vòng bảng theo điểm thắng rồi hiệu số điểm, 
     { id: 'C', diem: 1, hsDiem: 0, coHsHiep: false },
     { id: 'B', diem: 1, hsDiem: -9, coHsHiep: false },
   ]);
+});
+
+test('migration giữ kết quả vòng bảng và thay bracket cũ khi tứ kết chưa thi đấu', () => {
+  const result = evaluate(`(() => {
+    const teams = ['A1','A2','B1','B2','C1','C2','D1','D2'].map(id => ({MaDoi:id, MaGiai:'G1', BangDau:id[0]}));
+    const groups = ['A','B','C','D'].map((code, index) => ({
+      MaTran:'VB-'+code+'-01', MaGiai:'G1', Vong:'VONG_BANG_'+code, ThuTuTran:1,
+      MaDoi1:teams[index*2].MaDoi, MaDoi2:teams[index*2+1].MaDoi,
+      MaDoiThang:teams[index*2].MaDoi, TySoHiep1:'21-10', TySoHiep2:'', TySoHiep3:'', TrangThai:'HOAN_THANH'
+    }));
+    const oldSlots = ['A1','B2','B1','A2','C1','D2','D1','C2'].map(id => teams.find(team => team.MaDoi === id));
+    const memory = {DoiThiDau:teams, TranDau:groups.concat(createBracketMatches({MaGiai:'G1',CoTranhHangBa:false}, oldSlots, 8))};
+    getTournament = () => ({MaGiai:'G1',CoTranhHangBa:false});
+    rowsForTournament = name => memory[name] || [];
+    replaceRows = (name, rows) => { memory[name] = rows.map(row => Object.assign({}, row)); };
+    appendLog = () => {}; bumpCacheVersion = () => {}; SpreadsheetApp = {flush:() => {}};
+    migrateCompletedGroupsToCurrentKnockout();
+    const q = memory.TranDau.filter(match => !isGroupMatch(match) && roundNumber(match) === 1).sort((a,b) => a.ThuTuTran-b.ThuTuTran);
+    return {groupResults:memory.TranDau.filter(isGroupMatch).length, pairs:q.map(match => match.MaDoi1+'-'+match.MaDoi2)};
+  })()`);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    groupResults: 4,
+    pairs: ['A1-C2', 'C1-A2', 'B1-D2', 'D1-B2'],
+  });
 });
 
 test('28 người -> 14 đội -> 4 bảng 4-4-3-3 -> top 8 -> tứ kết đi tiếp', () => {

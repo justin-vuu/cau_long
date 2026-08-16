@@ -12,7 +12,7 @@ const SCHEMA = {
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
-const DATABASE_SCHEMA_VERSION = '2026-08-16.1';
+const DATABASE_SCHEMA_VERSION = '2026-08-16.2';
 const TOURNAMENT_MINIMUM_PLAYERS = 28;
 let spreadsheetInstance = null;
 
@@ -66,7 +66,14 @@ function doPost(e) {
 
 function ensureDatabase() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('DATABASE_SCHEMA_VERSION') !== DATABASE_SCHEMA_VERSION) ensureDatabaseSheetsOnly();
+  if (props.getProperty('DATABASE_SCHEMA_VERSION') !== DATABASE_SCHEMA_VERSION) {
+    withLock(() => {
+      if (props.getProperty('DATABASE_SCHEMA_VERSION') !== DATABASE_SCHEMA_VERSION) {
+        ensureDatabaseSheetsOnly();
+        migrateCompletedGroupsToCurrentKnockout();
+      }
+    });
+  }
   if (props.getProperty('INITIAL_ADMIN_PASSWORD')) ensureInitialAdmin();
 }
 
@@ -156,6 +163,29 @@ function ensureDatabaseSheetsOnly() {
     updateRow('GiaiDau', 'MaGiai', tournament.MaGiai, { SoNguoiToiThieu: TOURNAMENT_MINIMUM_PLAYERS });
   }
   PropertiesService.getScriptProperties().setProperty('DATABASE_SCHEMA_VERSION', DATABASE_SCHEMA_VERSION);
+}
+
+function migrateCompletedGroupsToCurrentKnockout() {
+  const tournament = getTournament();
+  if (!tournament) return;
+  const matches = rowsForTournament('TranDau', tournament.MaGiai).map(stripInternal);
+  const groupMatches = matches.filter(isGroupMatch);
+  if (!groupMatches.length || !groupMatches.every(isCompletedMatch)) return;
+  const existingKnockout = matches.filter(match => !isGroupMatch(match));
+  if (existingKnockout.some(match => isCompletedMatch(match) && String(match.TrangThai) !== 'MIEN_DAU')) {
+    console.log('Không tự đổi cặp vì vòng loại trực tiếp đã có kết quả.');
+    return;
+  }
+  const teams = rowsForTournament('DoiThiDau', tournament.MaGiai).map(stripInternal);
+  const rebuiltKnockout = createKnockoutAfterGroups(tournament, teams, groupMatches);
+  const signature = list => list.filter(match => roundNumber(match) === 1)
+    .sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran))
+    .map(match => String(match.MaDoi1) + '-' + String(match.MaDoi2)).join('|');
+  if (signature(existingKnockout) === signature(rebuiltKnockout)) return;
+  replaceRows('TranDau', groupMatches.concat(rebuiltKnockout));
+  appendLog(tournament.MaGiai, 'SYSTEM', 'CAP_NHAT_CAP_TU_KET', 'Đổi cặp tứ kết A-C, B-D; bán kết TK1-TK2 và TK3-TK4.');
+  bumpCacheVersion();
+  SpreadsheetApp.flush();
 }
 
 function validateSharedSecret(provided) {
@@ -619,24 +649,11 @@ function createKnockoutAfterGroups(tournament, teams, groupMatches) {
   const qualified = {};
   codes.forEach(code => { qualified[code + '1'] = standings[code][0] && standings[code][0].Doi; qualified[code + '2'] = standings[code][1] && standings[code][1].Doi; });
   let seedKeys;
-  if (codes.length === 4) seedKeys = ['A1', 'B2', 'B1', 'A2', 'C1', 'D2', 'D1', 'C2'];
+  if (codes.length === 4) seedKeys = ['A1', 'C2', 'C1', 'A2', 'B1', 'D2', 'D1', 'B2'];
   else if (codes.length === 2) seedKeys = ['A1', 'B2', 'B1', 'A2'];
   else seedKeys = ['A1', 'A2'];
   const slots = seedKeys.map(key => qualified[key]).filter(Boolean);
-  const knockout = createBracketMatches(tournament, slots, slots.length);
-  if (codes.length === 4) wireQuarterfinalCrossSemifinals(knockout);
-  return knockout;
-}
-
-// TK1 gặp TK3, TK2 gặp TK4 để hai đội cùng bảng chỉ có thể tái đấu ở chung kết.
-function wireQuarterfinalCrossSemifinals(matches) {
-  const quarters = matches.filter(match => roundNumber(match) === 1).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran));
-  const semis = matches.filter(match => roundNumber(match) === 2).sort((a, b) => Number(a.ThuTuTran) - Number(b.ThuTuTran));
-  if (quarters.length !== 4 || semis.length !== 2) return;
-  [[0, 0, 1], [2, 0, 2], [1, 1, 1], [3, 1, 2]].forEach(mapping => {
-    quarters[mapping[0]].MaTranTiepTheo = semis[mapping[1]].MaTran;
-    quarters[mapping[0]].ViTriVaoTranTiepTheo = mapping[2];
-  });
+  return createBracketMatches(tournament, slots, slots.length);
 }
 
 function capNhatKetQuaTranDau(request) {
