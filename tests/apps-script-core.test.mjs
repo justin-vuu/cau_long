@@ -57,6 +57,12 @@ test('kiểm tra luật một set vòng bảng 21 trần 25 và vòng trong 25 t
   assert.throws(() => evaluate(`validateScores(['25-24','',''], {Vong:'TU_KET', MaDoi1:'A', MaDoi2:'B'}, 'A')`), /trần 31/);
 });
 
+test('cột tỷ số được ép kiểu văn bản để Google Sheets không đổi thành ngày tháng', () => {
+  assert.match(source, /function formatScoreColumnsAsText\(/);
+  assert.match(source, /setNumberFormat\('@'\)/);
+  assert.match(source, /if \(sheetName === 'TranDau'\) formatScoreColumnsAsText\(sheet\)/);
+});
+
 test('tứ kết bắt cặp chéo bảng và bán kết TK1-TK3, TK2-TK4', () => {
   const result = evaluate(`(() => {
     const teams = ['A1','A2','B1','B2','C1','C2','D1','D2'].map(id => ({MaDoi:id, BangDau:id[0]}));

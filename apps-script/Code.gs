@@ -12,7 +12,7 @@ const SCHEMA = {
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
-const DATABASE_SCHEMA_VERSION = '2026-08-12.1';
+const DATABASE_SCHEMA_VERSION = '2026-08-16.1';
 const TOURNAMENT_MINIMUM_PLAYERS = 28;
 let spreadsheetInstance = null;
 
@@ -91,6 +91,15 @@ function ensureSheet(spreadsheet, name, requiredHeaders) {
   }
   sheet.setFrozenRows(1);
   sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight('bold').setBackground('#14233d').setFontColor('#ffffff');
+  if (name === 'TranDau') formatScoreColumnsAsText(sheet);
+}
+
+function formatScoreColumnsAsText(sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  ['TySoHiep1', 'TySoHiep2', 'TySoHiep3'].forEach(header => {
+    const column = headers.indexOf(header) + 1;
+    if (column > 0) sheet.getRange(2, column, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat('@');
+  });
 }
 
 function ensureInitialAdmin() {
@@ -785,6 +794,7 @@ function deleteRow(sheetName, idField, idValue) {
 function replaceRows(sheetName, objects) {
   const sheet = getSpreadsheet().getSheetByName(sheetName);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  if (sheetName === 'TranDau') formatScoreColumnsAsText(sheet);
   if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
   if (objects.length) sheet.getRange(2, 1, objects.length, headers.length).setValues(objects.map(object => headers.map(header => valueForSheet(object[header]))));
 }

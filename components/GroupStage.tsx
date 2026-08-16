@@ -14,5 +14,7 @@ export default function GroupStage({ groups }: { groups: TournamentGroup[] }) {
 }
 
 function sideScore(match: TournamentGroup['matches'][number], side: number) {
-  return [match.TySoHiep1, match.TySoHiep2, match.TySoHiep3].filter(Boolean).map(score => String(score).split(/[-–:]/)[side] || '').join(' · ');
+  if (!match.TySoHiep1) return '';
+  const parts = String(match.TySoHiep1).match(/^(\d{1,2})[-–:](\d{1,2})$/);
+  return parts ? parts[side + 1] : side === 0 ? 'Lỗi tỷ số' : '';
 }

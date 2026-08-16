@@ -6,7 +6,8 @@ function TeamRow({ team, match, slot }: { team?: Team | null; match: Match; slot
   const isWinner = !!id && id === match.MaDoiThang;
   const firstRoundBye = match.SoVong === 1 && !id;
   const scoreKey = slot === 1 ? 0 : 1;
-  const scores = [match.TySoHiep1, match.TySoHiep2, match.TySoHiep3].filter(Boolean).map(s => String(s).split(/[-–:]/)[scoreKey] || '');
+  const scoreMatch = String(match.TySoHiep1 || '').match(/^(\d{1,2})[-–:](\d{1,2})$/);
+  const scores = scoreMatch ? [scoreMatch[scoreKey + 1]] : match.TySoHiep1 && scoreKey === 0 ? ['Lỗi'] : [];
   return <div className={`bracket-team ${isWinner ? 'winner' : ''} ${firstRoundBye ? 'bye' : ''}`}><span className="team-name">{firstRoundBye ? 'BYE' : team?.TenHienThi || 'Đang chờ'}</span><span className="scores">{scores.map((score, i) => <b key={i}>{score}</b>)}{isWinner && <Trophy size={13} />}</span></div>;
 }
 
