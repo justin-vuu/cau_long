@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ArrowLeft, CheckCircle2, Info, QrCode, Send } from 'lucide-react';
 import PublicShell from '@/components/PublicShell';
 import { callApi } from '@/lib/api';
-import qrPayment from '@/anh_quan_trong/anh_qr.jpg';
+import qrPayment from '@/anh_quan_trong/anh_qr_cl40.png';
 
 const FEE = '200.000 đồng';
 const FEE_DEADLINE = '11/11/2026';
@@ -39,7 +39,7 @@ export default function RegisterPage() {
     <Link href="/" className="back"><ArrowLeft size={16} /> Về trang chủ</Link>
     <div className="register-grid">
       <section><span className="kicker">LỆ PHÍ VẬN ĐỘNG VIÊN</span><h1>{FEE} / người, đóng trước ngày {FEE_DEADLINE}</h1><p className="intro">Vận động viên quét mã QR bên dưới để chuyển khoản, nội dung ghi <b>{TRANSFER_NOTE}</b>. Thầy cô, khách mời và cổ động viên không thu phí.</p>
-        <div className="qr-card card"><div className="qr-title"><QrCode size={18} /><span><b>QUÉT MÃ ĐỂ THANH TOÁN</b><small>Chủ tài khoản: BÙI THỊ YẾN</small></span></div><Image src={qrPayment} alt="Mã QR chuyển khoản lệ phí giải cầu lông" priority sizes="(max-width: 850px) 90vw, 390px" /><p>Có thể đăng ký trước và chuyển khoản sau, chậm nhất ngày {FEE_DEADLINE}.</p></div>
+        <div className="qr-card card"><div className="qr-title"><QrCode size={18} /><span><b>QUÉT MÃ ĐỂ THANH TOÁN</b><small>Chủ tài khoản: ĐỖ ĐĂNG VŨ · MB 0382018862</small></span></div><Image src={qrPayment} alt="Mã QR chuyển khoản lệ phí giải cầu lông" priority sizes="(max-width: 850px) 90vw, 390px" /><p>Có thể đăng ký trước và chuyển khoản sau, chậm nhất ngày {FEE_DEADLINE}.</p></div>
         <div className="notice"><Info size={20} /><div><b>Đánh đôi, không phân biệt nam nữ</b><p>Mỗi người đăng ký cá nhân. Nếu đã có đồng đội, hãy ghi tên ở ô &quot;Đồng đội mong muốn&quot;. Ban tổ chức sẽ xếp cặp, chia bảng và công bố lịch thi đấu sau khi đóng đăng ký.</p></div></div>
       </section>
       <section className="card form-card">
