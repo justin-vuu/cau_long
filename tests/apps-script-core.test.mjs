@@ -212,3 +212,45 @@ test('seed test tạo đúng 31 người và tất cả đều có nhãn an toà
   assert.equal(result.tagged, 31);
   assert.equal(result.paid, 31);
 });
+
+function validatePublic(player) {
+  return evaluate(`(() => {
+    const originalRows = rowsForTournament; const originalId = makeId;
+    rowsForTournament = () => []; makeId = prefix => prefix + '-TEST';
+    try { return validatePlayer(${JSON.stringify(player)}, 'G1', '', false); }
+    finally { rowsForTournament = originalRows; makeId = originalId; }
+  })()`);
+}
+
+const athlete = { HoTen: 'Nguyễn Văn An', SoDienThoai: '0912345678', GioiTinh: 'Nam', KhoaHoc: '2005-2008', LopChuyen: 'Toán', TrinhDo: 'Phong trào', VaiTro: 'Vận động viên', CamKetDongPhi: true };
+
+test('phiếu đăng ký CL40 lưu khóa, lớp chuyên, đồng đội mong muốn và hỗ trợ', () => {
+  const player = validatePublic({ ...athlete, DongDoiMongMuon: 'Trần Bình', HoTro: '2 ống cầu' });
+  assert.equal(player.KhoaHoc, '2005-2008');
+  assert.equal(player.LopChuyen, 'Toán');
+  assert.equal(player.TrinhDo, 'Phong trào');
+  assert.equal(player.VaiTro, 'Vận động viên');
+  assert.equal(player.DongDoiMongMuon, 'Trần Bình');
+  assert.equal(player.HoTro, '2 ống cầu');
+  assert.equal(player.CamKetDongPhi, true);
+  assert.equal(player.DaChuyenKhoan, false);
+  assert.equal(player.TrangThai, 'CHO_XAC_NHAN');
+});
+
+test('vận động viên phải cam kết đóng phí và khai khóa, cổ động viên thì không cần đóng phí', () => {
+  assert.throws(() => validatePublic({ ...athlete, CamKetDongPhi: false }), /cam kết/);
+  assert.throws(() => validatePublic({ ...athlete, KhoaHoc: '' }), /khóa/);
+  assert.throws(() => validatePublic({ ...athlete, VaiTro: 'Trọng tài' }), /Vai trò/);
+  const fan = validatePublic({ ...athlete, VaiTro: 'Cổ động viên', TrinhDo: '', CamKetDongPhi: false });
+  assert.equal(fan.VaiTro, 'Cổ động viên');
+  assert.equal(fan.CamKetDongPhi, false);
+});
+
+test('cổ động viên không được xác nhận vào danh sách thi đấu', () => {
+  assert.throws(() => evaluate(`(() => {
+    const originalRows = rowsForTournament; const originalId = makeId;
+    rowsForTournament = () => []; makeId = prefix => prefix + '-TEST';
+    try { return validatePlayer(${JSON.stringify({ ...athlete, VaiTro: 'Cổ động viên', TrangThai: 'DA_XAC_NHAN' })}, 'G1', '', true); }
+    finally { rowsForTournament = originalRows; makeId = originalId; }
+  })()`), /Cổ động viên/);
+});

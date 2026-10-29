@@ -28,6 +28,12 @@ export interface Player {
   TrangThai: PlayerStatus;
   ThoiGianDangKy: string;
   DaChuyenKhoan?: boolean;
+  KhoaHoc?: string;
+  LopChuyen?: string;
+  VaiTro?: string;
+  DongDoiMongMuon?: string;
+  CamKetDongPhi?: boolean;
+  HoTro?: string;
 }
 
 export interface TeamMember {

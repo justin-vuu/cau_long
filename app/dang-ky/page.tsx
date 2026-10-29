@@ -8,40 +8,56 @@ import PublicShell from '@/components/PublicShell';
 import { callApi } from '@/lib/api';
 import qrPayment from '@/anh_quan_trong/anh_qr.jpg';
 
-const initial = { HoTen: '', SoDienThoai: '', GioiTinh: '', DaChuyenKhoan: false };
+const FEE = '200.000 đồng';
+const FEE_DEADLINE = '11/11/2026';
+const TRANSFER_NOTE = 'Họ tên - Khóa - CL40';
+const ATHLETE = 'Vận động viên';
+const initial = { HoTen: '', KhoaHoc: '', LopChuyen: '', SoDienThoai: '', GioiTinh: '', TrinhDo: '', DongDoiMongMuon: '', VaiTro: ATHLETE, CamKetDongPhi: false, DaChuyenKhoan: false, HoTro: '' };
+type TextField = 'HoTen' | 'KhoaHoc' | 'LopChuyen' | 'SoDienThoai' | 'GioiTinh' | 'TrinhDo' | 'DongDoiMongMuon' | 'VaiTro' | 'HoTro';
 
 export default function RegisterPage() {
   const [form, setForm] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [code, setCode] = useState('');
-  const change = (key: 'HoTen' | 'SoDienThoai' | 'GioiTinh', value: string) => setForm(prev => ({ ...prev, [key]: value }));
+  const change = (key: TextField, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+  const isAthlete = form.VaiTro === ATHLETE;
   async function submit(e: FormEvent) {
     e.preventDefault(); setError('');
     if (form.HoTen.trim().length < 2) return setError('Vui lòng nhập họ tên hợp lệ.');
     if (!/^(0|\+84)[0-9]{9,10}$/.test(form.SoDienThoai.replace(/[ .-]/g, ''))) return setError('Số điện thoại chưa đúng định dạng Việt Nam.');
-    if (!form.DaChuyenKhoan) return setError('Bạn cần chuyển khoản lệ phí trước khi gửi đăng ký.');
+    if (!form.KhoaHoc.trim()) return setError('Vui lòng nhập khóa (niên khóa).');
+    if (isAthlete && !form.TrinhDo) return setError('Vui lòng tự đánh giá trình độ.');
+    if (isAthlete && !form.CamKetDongPhi) return setError(`Vận động viên cần xác nhận đóng ${FEE} trước ngày ${FEE_DEADLINE}.`);
+    const player = isAthlete ? form : { ...form, TrinhDo: '', DongDoiMongMuon: '', CamKetDongPhi: false, DaChuyenKhoan: false };
     setLoading(true);
-    try { const result = await callApi<{ MaNguoiChoi: string }>('dangKyNguoiChoi', { player: form }); setCode(result.MaNguoiChoi); setForm(initial); }
+    try { const result = await callApi<{ MaNguoiChoi: string }>('dangKyNguoiChoi', { player }); setCode(result.MaNguoiChoi); setForm(initial); }
     catch (e) { setError(e instanceof Error ? e.message : 'Đăng ký không thành công.'); }
     finally { setLoading(false); }
   }
   return <PublicShell><main className="register-bg"><div className="container-page register-wrap">
     <Link href="/" className="back"><ArrowLeft size={16} /> Về trang chủ</Link>
     <div className="register-grid">
-      <section><span className="kicker">BƯỚC 1 · CHUYỂN KHOẢN</span><h1>Chuyển lệ phí để giữ suất thi đấu</h1><p className="intro">Chỉ người chơi đã chuyển khoản mới được gửi đăng ký. Hãy quét mã QR bên dưới và ghi nội dung chuyển khoản gồm <b>họ tên + số điện thoại</b> để ban tổ chức dễ đối soát.</p>
-        <div className="qr-card card"><div className="qr-title"><QrCode size={18} /><span><b>QUÉT MÃ ĐỂ THANH TOÁN</b><small>Chủ tài khoản: BÙI THỊ YẾN</small></span></div><Image src={qrPayment} alt="Mã QR chuyển khoản lệ phí giải cầu lông" priority sizes="(max-width: 850px) 90vw, 390px" /><p>Sau khi chuyển khoản thành công, hoàn thành biểu mẫu bên cạnh.</p></div>
-        <div className="notice"><Info size={20} /><div><b>Đăng ký cá nhân</b><p>Ban tổ chức sẽ kiểm tra giao dịch, xác nhận người chơi rồi bốc thăm ngẫu nhiên để ghép mỗi hai người thành một đội.</p></div></div>
+      <section><span className="kicker">LỆ PHÍ VẬN ĐỘNG VIÊN</span><h1>{FEE} / người, đóng trước ngày {FEE_DEADLINE}</h1><p className="intro">Vận động viên quét mã QR bên dưới để chuyển khoản, nội dung ghi <b>{TRANSFER_NOTE}</b>. Thầy cô, khách mời và cổ động viên không thu phí.</p>
+        <div className="qr-card card"><div className="qr-title"><QrCode size={18} /><span><b>QUÉT MÃ ĐỂ THANH TOÁN</b><small>Chủ tài khoản: BÙI THỊ YẾN</small></span></div><Image src={qrPayment} alt="Mã QR chuyển khoản lệ phí giải cầu lông" priority sizes="(max-width: 850px) 90vw, 390px" /><p>Có thể đăng ký trước và chuyển khoản sau, chậm nhất ngày {FEE_DEADLINE}.</p></div>
+        <div className="notice"><Info size={20} /><div><b>Đánh đôi, không phân biệt nam nữ</b><p>Mỗi người đăng ký cá nhân. Nếu đã có đồng đội, hãy ghi tên ở ô &quot;Đồng đội mong muốn&quot;. Ban tổ chức sẽ xếp cặp, chia bảng và công bố lịch thi đấu sau khi đóng đăng ký.</p></div></div>
       </section>
       <section className="card form-card">
         {code ? <div className="success"><span><CheckCircle2 size={42} /></span><h2>Đăng ký thành công!</h2><p>Thông tin của bạn đã được gửi đến ban tổ chức. Hãy lưu mã đăng ký:</p><strong>{code}</strong><p className="small">Đăng ký đang ở trạng thái chờ xác nhận.</p><div><Link href="/nguoi-choi" className="btn btn-primary">Xem danh sách</Link><button className="btn btn-secondary" onClick={() => setCode('')}>Đăng ký người khác</button></div></div> : <>
-          <div className="form-title"><span>BƯỚC 2 · GỬI THÔNG TIN</span><h2>Thông tin người chơi</h2><p>Chỉ cần nhập đúng 3 thông tin bên dưới.</p></div>
+          <div className="form-title"><span>PHIẾU ĐĂNG KÝ ONLINE</span><h2>Thông tin người chơi</h2><p>Giao lưu cầu lông cựu học sinh Trần Phú, chào mừng 40 năm thành lập trường.</p></div>
           <form onSubmit={submit}><div className="form-grid">
-            <label><span className="label">Họ và tên *</span><input className="input" value={form.HoTen} onChange={e => change('HoTen', e.target.value)} placeholder="Nguyễn Văn An" maxLength={80} required /></label>
-            <label><span className="label">Số điện thoại *</span><input className="input" value={form.SoDienThoai} onChange={e => change('SoDienThoai', e.target.value)} placeholder="09xxxxxxxx" inputMode="tel" maxLength={15} required /></label>
-            <label className="full"><span className="label">Giới tính *</span><select className="select" value={form.GioiTinh} onChange={e => change('GioiTinh', e.target.value)} required><option value="">Chọn giới tính</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label>
-            <label className="payment-check full"><input type="checkbox" checked={form.DaChuyenKhoan} onChange={e => setForm(prev => ({ ...prev, DaChuyenKhoan: e.target.checked }))} /><span><b>Tôi xác nhận đã chuyển khoản lệ phí</b><small>Ban tổ chức sẽ đối soát giao dịch trước khi xác nhận suất thi đấu.</small></span></label>
-          </div>{error && <div className="form-error">{error}</div>}<button className="btn btn-primary submit" disabled={loading || !form.DaChuyenKhoan}>{loading ? <><span className="spinner mini" /> Đang gửi...</> : <><Send size={17} /> Xác nhận và gửi đăng ký</>}</button><p className="privacy">Số điện thoại dùng để liên hệ và đối soát chuyển khoản, không xuất hiện công khai.</p></form>
+            <label className="full"><span className="label">Tham gia với tư cách *</span><select className="select" value={form.VaiTro} onChange={e => change('VaiTro', e.target.value)} required><option>Vận động viên</option><option>Cổ động viên</option></select></label>
+            <label className="full"><span className="label">Họ và tên *</span><input className="input" value={form.HoTen} onChange={e => change('HoTen', e.target.value)} placeholder="Nguyễn Văn An" maxLength={80} required /></label>
+            <label><span className="label">Khóa (niên khóa) *</span><input className="input" value={form.KhoaHoc} onChange={e => change('KhoaHoc', e.target.value)} placeholder="2005-2008" maxLength={30} required /></label>
+            <label><span className="label">Lớp chuyên</span><input className="input" value={form.LopChuyen} onChange={e => change('LopChuyen', e.target.value)} placeholder="Toán, Lý, Anh..." maxLength={60} /></label>
+            <label><span className="label">Số điện thoại (Zalo) *</span><input className="input" value={form.SoDienThoai} onChange={e => change('SoDienThoai', e.target.value)} placeholder="09xxxxxxxx" inputMode="tel" maxLength={15} required /></label>
+            <label><span className="label">Giới tính *</span><select className="select" value={form.GioiTinh} onChange={e => change('GioiTinh', e.target.value)} required><option value="">Chọn giới tính</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label>
+            {isAthlete && <><label><span className="label">Tự đánh giá trình độ *</span><select className="select" value={form.TrinhDo} onChange={e => change('TrinhDo', e.target.value)} required><option value="">Chọn trình độ</option><option>Mới chơi</option><option>Phong trào</option><option>Khá</option></select></label>
+            <label><span className="label">Đồng đội mong muốn</span><input className="input" value={form.DongDoiMongMuon} onChange={e => change('DongDoiMongMuon', e.target.value)} placeholder="Họ tên, khóa (nếu có)" maxLength={120} /></label></>}
+            <label className="full"><span className="label">Có thể hỗ trợ, tài trợ</span><input className="input" value={form.HoTro} onChange={e => change('HoTro', e.target.value)} placeholder="Cầu, nước, giải thưởng, chụp ảnh..." maxLength={300} /></label>
+            {isAthlete && <><label className="payment-check full"><input type="checkbox" checked={form.CamKetDongPhi} onChange={e => setForm(prev => ({ ...prev, CamKetDongPhi: e.target.checked }))} /><span><b>Tôi xác nhận đóng {FEE} trước ngày {FEE_DEADLINE} *</b><small>Ban tổ chức đối soát giao dịch trước khi xác nhận suất thi đấu.</small></span></label>
+            <label className="payment-check full"><input type="checkbox" checked={form.DaChuyenKhoan} onChange={e => setForm(prev => ({ ...prev, DaChuyenKhoan: e.target.checked }))} /><span><b>Tôi đã chuyển khoản</b><small>Bỏ trống nếu bạn sẽ chuyển sau.</small></span></label></>}
+          </div>{error && <div className="form-error">{error}</div>}<button className="btn btn-primary submit" disabled={loading || (isAthlete && !form.CamKetDongPhi)}>{loading ? <><span className="spinner mini" /> Đang gửi...</> : <><Send size={17} /> Xác nhận và gửi đăng ký</>}</button><p className="privacy">Số điện thoại chỉ dùng để liên hệ qua Zalo và đối soát chuyển khoản, không xuất hiện công khai.</p></form>
         </>}
       </section>
     </div>

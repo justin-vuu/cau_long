@@ -6,14 +6,17 @@
 
 const SCHEMA = {
   GiaiDau: ['MaGiai', 'TenGiai', 'DiaDiem', 'NgayBatDau', 'HanDangKy', 'TrangThai', 'SoNguoiToiThieu', 'CoTranhHangBa', 'ThoiGianBocTham', 'NguoiBocTham'],
-  NguoiChoi: ['MaNguoiChoi', 'MaGiai', 'HoTen', 'SoDienThoai', 'GioiTinh', 'TrinhDo', 'CauLacBo', 'GhiChu', 'TrangThai', 'ThoiGianDangKy', 'DaChuyenKhoan'],
+  NguoiChoi: ['MaNguoiChoi', 'MaGiai', 'HoTen', 'SoDienThoai', 'GioiTinh', 'TrinhDo', 'CauLacBo', 'GhiChu', 'TrangThai', 'ThoiGianDangKy', 'DaChuyenKhoan', 'KhoaHoc', 'LopChuyen', 'VaiTro', 'DongDoiMongMuon', 'CamKetDongPhi', 'HoTro'],
   DoiThiDau: ['MaDoi', 'MaGiai', 'MaNguoiChoi1', 'MaNguoiChoi2', 'ViTriBracket', 'TenHienThi', 'TrangThai', 'BangDau'],
   TranDau: ['MaTran', 'MaGiai', 'Vong', 'ThuTuTran', 'MaDoi1', 'MaDoi2', 'MaDoiThang', 'TySoHiep1', 'TySoHiep2', 'TySoHiep3', 'TrangThai', 'MaTranTiepTheo', 'ViTriVaoTranTiepTheo', 'GhiChu'],
   NguoiDung: ['MaNguoiDung', 'TaiKhoan', 'HoTen', 'VaiTro', 'TrangThai', 'MatKhauHash'],
   NhatKy: ['MaNhatKy', 'MaGiai', 'ThoiGian', 'NguoiThucHien', 'HanhDong', 'NoiDung'],
 };
-const DATABASE_SCHEMA_VERSION = '2026-08-16.2';
+const DATABASE_SCHEMA_VERSION = '2026-10-29.1';
 const TOURNAMENT_MINIMUM_PLAYERS = 28;
+const PLAYER_LEVELS = ['Chưa phân loại', 'Mới chơi', 'Phong trào', 'Trung bình', 'Khá', 'Nâng cao'];
+const ROLE_ATHLETE = 'Vận động viên';
+const ROLE_FAN = 'Cổ động viên';
 let spreadsheetInstance = null;
 
 const PUBLIC_ACTIONS = new Set([
@@ -305,7 +308,6 @@ function dangKyNguoiChoi(request) {
     const tournament = requireTournament();
     if (String(tournament.TrangThai) !== 'DANG_DANG_KY') throw apiError('Giải đấu hiện không nhận đăng ký.', 'REGISTRATION_CLOSED');
     if (new Date(tournament.HanDangKy).getTime() < Date.now()) throw apiError('Đã quá hạn đăng ký.', 'REGISTRATION_CLOSED');
-    if (!toBoolean((request.player || {}).DaChuyenKhoan)) throw apiError('Chỉ người đã chuyển khoản lệ phí mới được đăng ký.', 'PAYMENT_REQUIRED');
     const player = validatePlayer(request.player || {}, tournament.MaGiai, '', false);
     appendRow('NguoiChoi', player);
     appendLog(tournament.MaGiai, player.MaNguoiChoi, 'DANG_KY_CONG_KHAI', player.HoTen);
@@ -318,7 +320,7 @@ function layDanhSachNguoiChoiCongKhai() {
     const tournament = requireTournament();
     const players = rowsForTournament('NguoiChoi', tournament.MaGiai)
       .sort((a, b) => new Date(a.ThoiGianDangKy) - new Date(b.ThoiGianDangKy))
-      .map(player => pick(player, ['MaNguoiChoi', 'MaGiai', 'HoTen', 'GioiTinh', 'TrinhDo', 'CauLacBo', 'TrangThai', 'ThoiGianDangKy']));
+      .map(player => pick(player, ['MaNguoiChoi', 'MaGiai', 'HoTen', 'GioiTinh', 'TrinhDo', 'CauLacBo', 'TrangThai', 'ThoiGianDangKy', 'KhoaHoc', 'LopChuyen', 'VaiTro']));
     return { tournament: publicTournament(tournament), players };
   });
 }
@@ -364,6 +366,7 @@ function capNhatTrangThaiNguoiChoi(request) {
   if (['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'TU_CHOI'].indexOf(status) === -1) throw apiError('Trạng thái không hợp lệ.', 'VALIDATION_ERROR');
   const player = rowsForTournament('NguoiChoi', tournament.MaGiai).find(item => String(item.MaNguoiChoi) === String(request.MaNguoiChoi || ''));
   if (!player) throw apiError('Không tìm thấy người chơi.', 'NOT_FOUND');
+  if (status === 'DA_XAC_NHAN' && String(player.VaiTro) === ROLE_FAN) throw apiError('Cổ động viên không được xác nhận vào danh sách thi đấu.', 'VALIDATION_ERROR');
   if (status === 'DA_XAC_NHAN' && !toBoolean(player.DaChuyenKhoan)) throw apiError('Chỉ xác nhận người chơi sau khi đã đối soát chuyển khoản.', 'PAYMENT_REQUIRED');
   updateRow('NguoiChoi', 'MaNguoiChoi', String(request.MaNguoiChoi || ''), { TrangThai: status });
   appendLog(tournament.MaGiai, request._user.TaiKhoan, 'CAP_NHAT_TRANG_THAI_NGUOI_CHOI', request.MaNguoiChoi + ' -> ' + status);
@@ -375,18 +378,27 @@ function validatePlayer(input, tournamentId, excludeId, isAdmin) {
   const phone = normalizePhone(input.SoDienThoai);
   const gender = cleanText(input.GioiTinh, 20);
   const level = cleanText(input.TrinhDo || 'Chưa phân loại', 30);
+  const role = cleanText(input.VaiTro || ROLE_ATHLETE, 30);
+  const cohort = cleanText(input.KhoaHoc, 30);
+  const pledged = role === ROLE_ATHLETE && toBoolean(input.CamKetDongPhi);
   if (name.length < 2) throw apiError('Họ tên phải có ít nhất 2 ký tự.', 'VALIDATION_ERROR');
   if (!/^0\d{9}$/.test(phone)) throw apiError('Số điện thoại Việt Nam không hợp lệ.', 'VALIDATION_ERROR');
   if (['Nam', 'Nữ', 'Khác'].indexOf(gender) === -1) throw apiError('Giới tính không hợp lệ.', 'VALIDATION_ERROR');
-  if (['Chưa phân loại', 'Mới chơi', 'Trung bình', 'Khá', 'Nâng cao'].indexOf(level) === -1) throw apiError('Trình độ không hợp lệ.', 'VALIDATION_ERROR');
+  if (PLAYER_LEVELS.indexOf(level) === -1) throw apiError('Trình độ không hợp lệ.', 'VALIDATION_ERROR');
+  if ([ROLE_ATHLETE, ROLE_FAN].indexOf(role) === -1) throw apiError('Vai trò tham gia không hợp lệ.', 'VALIDATION_ERROR');
+  if (!isAdmin && !cohort) throw apiError('Vui lòng nhập khóa (niên khóa).', 'VALIDATION_ERROR');
+  if (!isAdmin && role === ROLE_ATHLETE && !pledged) throw apiError('Vận động viên cần cam kết đóng lệ phí đúng hạn.', 'PAYMENT_REQUIRED');
   const duplicate = rowsForTournament('NguoiChoi', tournamentId).some(player => normalizePhone(player.SoDienThoai) === phone && String(player.MaNguoiChoi) !== excludeId);
   if (duplicate) throw apiError('Số điện thoại này đã đăng ký trong giải.', 'DUPLICATE_PHONE');
   let status = isAdmin ? String(input.TrangThai || 'DA_XAC_NHAN') : 'CHO_XAC_NHAN';
   if (['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'TU_CHOI'].indexOf(status) === -1) status = 'CHO_XAC_NHAN';
+  if (status === 'DA_XAC_NHAN' && role === ROLE_FAN) throw apiError('Cổ động viên không được xác nhận vào danh sách thi đấu.', 'VALIDATION_ERROR');
   return {
     MaNguoiChoi: excludeId || makeId('NC'), MaGiai: tournamentId, HoTen: name, SoDienThoai: phone,
     GioiTinh: gender, TrinhDo: level, CauLacBo: cleanText(input.CauLacBo, 120),
-    GhiChu: cleanText(input.GhiChu, 500), TrangThai: status, ThoiGianDangKy: new Date(), DaChuyenKhoan: isAdmin ? true : toBoolean(input.DaChuyenKhoan),
+    GhiChu: cleanText(input.GhiChu, 500), TrangThai: status, ThoiGianDangKy: new Date(), DaChuyenKhoan: isAdmin && input.DaChuyenKhoan === undefined ? true : toBoolean(input.DaChuyenKhoan),
+    KhoaHoc: cohort, LopChuyen: cleanText(input.LopChuyen, 60), VaiTro: role,
+    DongDoiMongMuon: cleanText(input.DongDoiMongMuon, 120), CamKetDongPhi: pledged, HoTro: cleanText(input.HoTro, 300),
   };
 }
 
